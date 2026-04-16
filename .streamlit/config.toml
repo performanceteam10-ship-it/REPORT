@@ -1,4 +1,4 @@
-# 같은 사무실 Wi-Fi 등에서 다른 PC가 접속하려면 0.0.0.0 필요
+# 로컬: 같은 Wi-Fi에서 다른 PC가 접속하려면 address 유지.
+# Community Cloud는 포트를 플랫폼이 지정하므로 port 를 넣지 않음(배포 실패 방지).
 [server]
 address = "0.0.0.0"
-port = 8501

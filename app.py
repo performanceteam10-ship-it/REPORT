@@ -5,9 +5,10 @@ ROAS = 매출 ÷ 비용 × 100 (%)
 from __future__ import annotations
 
 import json
+import os
 import re
 import tempfile
-from datetime import timedelta
+from datetime import datetime, timedelta
 from pathlib import Path
 
 import pandas as pd
@@ -15,12 +16,18 @@ import plotly.graph_objects as go
 import streamlit as st
 
 from drive_report import download_drive_file, list_drive_reports
+from madup_api import (
+    DEFAULT_BASE as MADUP_API_DEFAULT_BASE,
+    download_madup_file,
+    find_latest_madup_path,
+    madup_report_filenames,
+)
 
 DEFAULT_REPORT_DIR = Path(
     r"C:\Users\MADUP\주식회사매드업 Dropbox\광고사업부\4. 광고주\샤크닌자\07. 리포트"
 )
 REPORT_FILE_RE = re.compile(
-    r"^Madup_Sharkninja_Daily Report_(\d{6})\.xlsx$", re.IGNORECASE
+    r"^Madup_Sharkninja_Daily[- ]Report_(\d{6})\.xlsx$", re.IGNORECASE
 )
 
 # ── 열 이름 ──────────────────────────────────────────────────────────────────
@@ -84,6 +91,55 @@ def _drive_secrets_ok() -> bool:
 @st.cache_data(ttl=120, show_spinner=False)
 def _drive_cached_bytes(file_id: str, sa_json: str) -> bytes:
     return download_drive_file(file_id, sa_json)
+
+
+def _server_os_cannot_use_embedded_windows_path() -> bool:
+    """Windows가 아닌 OS(Streamlit Cloud·Linux·macOS 등)에서는 C:\\ 기본 경로를 열 수 없음.
+
+    로컬 Windows(`os.name == "nt"`)만 예외. WSL은 보통 /mnt/c 로 `Path(...).is_dir()` 가 True가 되어 여기서 막히지 않음.
+    """
+    if os.name == "nt":
+        return False
+    s = str(DEFAULT_REPORT_DIR)
+    if not (len(s) >= 2 and s[1] == ":" and s[0].isalpha()):
+        return False
+    return not Path(DEFAULT_REPORT_DIR).is_dir()
+
+
+def _secret_has(name: str) -> bool:
+    try:
+        v = st.secrets.get(name)
+        if v is None:
+            return False
+        return bool(str(v).strip())
+    except Exception:
+        return False
+
+
+def _madup_secrets_ok() -> bool:
+    try:
+        key = str(st.secrets.get("MADUP_API_KEY", "") or "").strip()
+        if not key:
+            return False
+        fd = str(st.secrets.get("MADUP_DROPBOX_FOLDER", "") or "").strip()
+        sp = str(
+            st.secrets.get("MADUP_DROPBOX_PATH", "")
+            or st.secrets.get("MADUP_DROPBOX_FILE_PATH", "")
+            or ""
+        ).strip()
+        return bool(fd or sp)
+    except Exception:
+        return False
+
+
+@st.cache_data(ttl=120, show_spinner=False)
+def _madup_bytes_cached(api_key: str, path: str, base: str) -> bytes:
+    return download_madup_file(api_key, path, base)
+
+
+@st.cache_data(ttl=120, show_spinner=False)
+def _madup_latest_pair_cached(api_key: str, folder: str, base: str) -> tuple[str, bytes]:
+    return find_latest_madup_path(api_key, folder, base)
 
 
 # ── 포매터 ───────────────────────────────────────────────────────────────────
@@ -684,7 +740,68 @@ def main() -> None:
         st.subheader("리포트 파일")
         path: Path
 
-        if _drive_secrets_ok():
+        if _madup_secrets_ok():
+            st.caption("🔗 **Madup API** (Dropbox 다운로드)")
+            api_key = str(st.secrets["MADUP_API_KEY"]).strip()
+            base = str(st.secrets.get("MADUP_API_BASE") or MADUP_API_DEFAULT_BASE).strip()
+            folder = str(st.secrets.get("MADUP_DROPBOX_FOLDER") or "").strip()
+            single_path = str(
+                st.secrets.get("MADUP_DROPBOX_PATH")
+                or st.secrets.get("MADUP_DROPBOX_FILE_PATH")
+                or ""
+            ).strip()
+
+            if folder:
+                use_m = st.radio("파일", ["최신 자동", "날짜 선택"], horizontal=True)
+                if use_m == "최신 자동":
+                    try:
+                        dp, data = _madup_latest_pair_cached(api_key, folder, base)
+                    except Exception as e:
+                        st.error(f"Madup API: {e}")
+                        st.stop()
+                    path = Path(tempfile.gettempdir()) / "sn_madup_latest.xlsx"
+                    path.write_bytes(data)
+                    st.caption(f"열림: `{dp}`")
+                else:
+                    tags = [
+                        (datetime.now() - timedelta(days=i)).strftime("%y%m%d")
+                        for i in range(120)
+                    ]
+                    pick = st.selectbox(
+                        "리포트 날짜 (파일명 YYMMDD)",
+                        tags,
+                        format_func=lambda t: f"{t[:2]}/{t[2:4]}/{t[4:6]} ({t})",
+                    )
+                    data = None
+                    dp = ""
+                    for fname in madup_report_filenames(pick):
+                        cand = f"{folder.rstrip('/')}/{fname}"
+                        try:
+                            data = _madup_bytes_cached(api_key, cand, base)
+                            dp = cand
+                            break
+                        except Exception:
+                            continue
+                    if data is None:
+                        st.error("해당 날짜 파일이 없거나 API 오류(파일명 공백/하이픈 형식 모두 시도함).")
+                        st.stop()
+                    path = Path(tempfile.gettempdir()) / f"sn_madup_{pick}.xlsx"
+                    path.write_bytes(data)
+                    st.caption(f"열림: `{dp}`")
+            elif single_path:
+                try:
+                    data = _madup_bytes_cached(api_key, single_path, base)
+                except Exception as e:
+                    st.error(f"Madup API: {e}")
+                    st.stop()
+                path = Path(tempfile.gettempdir()) / "sn_madup_single.xlsx"
+                path.write_bytes(data)
+                st.caption(f"열림: `{single_path}`")
+            else:
+                st.error("MADUP_DROPBOX_FOLDER 또는 MADUP_DROPBOX_PATH 가 Secrets에 필요합니다.")
+                st.stop()
+
+        elif _drive_secrets_ok():
             st.caption("📁 **구글 드라이브** (Streamlit Secrets)")
             folder_id = str(st.secrets["GOOGLE_DRIVE_FOLDER_ID"]).strip()
             sa_raw = st.secrets["GOOGLE_SERVICE_ACCOUNT_JSON"]
@@ -711,11 +828,43 @@ def main() -> None:
             path.write_bytes(data)
             st.caption(f"열림: `{name}`")
         else:
+            st.caption("💾 **로컬 폴더** (이 PC 경로)")
+            ak = _secret_has("MADUP_API_KEY")
+            df = _secret_has("MADUP_DROPBOX_FOLDER")
+            sp = _secret_has("MADUP_DROPBOX_PATH") or _secret_has("MADUP_DROPBOX_FILE_PATH")
+            cloudish = _server_os_cannot_use_embedded_windows_path()
+
+            if cloudish:
+                st.warning(
+                    "**Madup Secrets 인식 여부** (하나라도 ❌면 지금 같은 로컬 폴더 화면만 뜹니다): "
+                    f"`MADUP_API_KEY` {'✅' if ak else '❌'} · "
+                    f"`MADUP_DROPBOX_FOLDER` {'✅' if df else '❌'} · "
+                    f"`MADUP_DROPBOX_PATH` {'✅' if sp else '❌'}"
+                )
+                st.caption(
+                    "❌이면 **키 값이 틀린 것보다**, Secrets **이름 오타·들여쓰기·`[섹션]` 안에 넣기**를 먼저 의심하세요. "
+                    "아래처럼 **맨 위 평평한 두 줄**이어야 합니다. **Save → Reboot app**."
+                )
+                st.code(
+                    'MADUP_API_KEY = "mk_..."\n'
+                    'MADUP_DROPBOX_FOLDER = "/광고사업부/4. 광고주/샤크닌자/07. 리포트"',
+                    language="toml",
+                )
+                st.error(
+                    "Streamlit Cloud 서버에는 **내 PC `C:\\` 폴더가 없습니다.** "
+                    "위 항목이 모두 ✅가 되어야 Madup으로 xlsx를 받습니다."
+                )
+                st.stop()
+
             report_dir = st.text_input("리포트 폴더", value=str(DEFAULT_REPORT_DIR))
             folder = Path(report_dir.strip())
             latest = find_latest_report(folder)
             if latest is None:
                 st.error("리포트 xlsx를 찾을 수 없습니다.")
+                st.info(
+                    "**Streamlit Cloud** 배포 시: Secrets에 Madup 또는 드라이브 설정이 없으면 "
+                    "위 오류가 납니다. 로컬과 동일한 키를 Cloud 앱 Secrets에 추가했는지 확인하세요."
+                )
                 st.stop()
 
             use_file = st.radio("파일", ["최신 자동", "직접 선택"], horizontal=True)

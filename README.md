@@ -1,6 +1,7 @@
 # SharkNinja Daily Report 대시보드
 
-Streamlit 앱. 로컬 폴더 또는 **구글 드라이브**(서비스 계정)에서 `Madup_Sharkninja_Daily Report_YYMMDD.xlsx` 를 읽습니다.
+Streamlit 앱. **Madup API**(Dropbox HTTP 다운로드), **구글 드라이브**(서비스 계정), 또는 로컬 폴더에서 `Madup_Sharkninja_Daily Report_YYMMDD.xlsx` 를 읽습니다.  
+우선순위: **Madup API → 구글 드라이브 → 로컬 폴더** (Secrets에 Madup 키가 있으면 Madup을 사용).
 
 ## 내 PC에서만 돌리고 팀에게 보여주기 (가장 단순)
 
@@ -22,19 +23,37 @@ Streamlit 앱. 로컬 폴더 또는 **구글 드라이브**(서비스 계정)에
 
 1. 이 저장소를 GitHub에 푸시합니다.
 2. [share.streamlit.io](https://share.streamlit.io) 에서 GitHub로 로그인 → **New app** → 저장소 / 브랜치 / Main file: `app.py` → **Deploy**.
-3. 앱 설정 **Secrets** 에 다음을 넣습니다 (이름 그대로):
+3. 앱 설정 **Secrets** 에 다음 중 필요한 것을 넣습니다 (이름 그대로).
+
+   **(선택 A) Madup API — Dropbox에서 파일 받기**
+
+   ```toml
+   MADUP_API_KEY = "발급받은_API_키"
+   # 선택: 기본값 https://api-auth.madup-dct.site
+   # MADUP_API_BASE = "https://api-auth.madup-dct.site"
+
+   # 아래 둘 중 하나: 폴더 경로(끝에 슬래시 없이) 또는 파일 전체 경로
+   MADUP_DROPBOX_FOLDER = "/reports/샤크닌자"
+   # MADUP_DROPBOX_PATH = "/reports/.../Madup_Sharkninja_Daily Report_260401.xlsx"
+   # (호환) MADUP_DROPBOX_FILE_PATH 로 동일 의미
+   ```
+
+   - `MADUP_DROPBOX_FOLDER` 가 있으면 사이드바에서 **최신 자동** 또는 **날짜 선택**으로 `Madup_Sharkninja_Daily Report_YYMMDD.xlsx` 를 받습니다.
+   - 폴더 대신 **단일 파일**만 쓰려면 `MADUP_DROPBOX_PATH`(또는 `MADUP_DROPBOX_FILE_PATH`)에 Dropbox 상의 전체 경로를 넣습니다.
+
+   **(선택 B) 구글 드라이브**
 
    ```toml
    GOOGLE_DRIVE_FOLDER_ID = "여기에_드라이브_폴더_ID"
    GOOGLE_SERVICE_ACCOUNT_JSON = """{ ... 서비스 계정 JSON 전체 ... }"""
    ```
 
-4. **구글 클라우드 콘솔**에서 서비스 계정을 만들고 JSON 키를 내려받습니다. **Drive API** 를 사용 설정합니다.
+4. Madup을 쓰지 않고 드라이브만 쓸 때: **구글 클라우드 콘솔**에서 서비스 계정을 만들고 JSON 키를 내려받습니다. **Drive API** 를 사용 설정합니다.
 5. 드라이브에서 리포트가 있는 **폴더**를 해당 서비스 계정 이메일( `xxx@....iam.gserviceaccount.com` )과 **공유**(뷰어 이상).
 
 폴더 ID는 URL `https://drive.google.com/drive/folders/폴더ID` 의 마지막 부분입니다.
 
-Secrets 가 없으면 앱은 로컬과 같이 사이드바의 **리포트 폴더** 경로를 사용합니다 (클라우드에서는 사용 불가).
+Madup·드라이브 Secrets 가 모두 없으면 앱은 로컬과 같이 사이드바의 **리포트 폴더** 경로를 사용합니다 (클라우드에서는 사용 불가).
 
 ## 로컬 실행
 
