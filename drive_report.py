@@ -13,7 +13,7 @@ from googleapiclient.discovery import build
 from googleapiclient.http import MediaIoBaseDownload
 
 REPORT_FILE_RE = re.compile(
-    r"^Madup_Sharkninja_Daily[- ]Report_(\d{6})\.xlsx$", re.IGNORECASE
+    r"^Madup_Sharkninja_Daily[- ]Report_(\d{6})\.(?:xlsx|parquet)$", re.IGNORECASE
 )
 SCOPES = ["https://www.googleapis.com/auth/drive.readonly"]
 

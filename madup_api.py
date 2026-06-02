@@ -12,8 +12,10 @@ DEFAULT_BASE = "https://api-auth.madup-dct.site"
 
 
 def madup_report_filenames(tag: str) -> tuple[str, ...]:
-    """Dropbox에 올라가는 파일명 변형(공백 / 하이픈)."""
+    """Dropbox 파일명 변형. parquet 를 우선 시도하고 xlsx 로 폴백."""
     return (
+        f"Madup_Sharkninja_Daily Report_{tag}.parquet",
+        f"Madup_Sharkninja_Daily-Report_{tag}.parquet",
         f"Madup_Sharkninja_Daily Report_{tag}.xlsx",
         f"Madup_Sharkninja_Daily-Report_{tag}.xlsx",
     )

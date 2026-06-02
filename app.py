@@ -27,7 +27,7 @@ DEFAULT_REPORT_DIR = Path(
     r"C:\Users\MADUP\주식회사매드업 Dropbox\광고사업부\4. 광고주\샤크닌자\07. 리포트"
 )
 REPORT_FILE_RE = re.compile(
-    r"^Madup_Sharkninja_Daily[- ]Report_(\d{6})\.xlsx$", re.IGNORECASE
+    r"^Madup_Sharkninja_Daily[- ]Report_(\d{6})\.(?:xlsx|parquet)$", re.IGNORECASE
 )
 
 # ── 열 이름 ──────────────────────────────────────────────────────────────────
@@ -54,18 +54,20 @@ HIER_COLS = ["매체상세", "캠페인", "그룹", "소재/키워드", COL_PROD
 
 # ── 파일 유틸 ─────────────────────────────────────────────────────────────────
 def find_latest_report(folder: Path) -> Path | None:
-    best: tuple[str, Path] | None = None
+    best: tuple[str, int, Path] | None = None  # (date_tag, ext_rank, path)
     if not folder.is_dir():
         return None
     for p in folder.iterdir():
         if not p.is_file():
             continue
         m = REPORT_FILE_RE.match(p.name)
-        if m:
-            tag = m.group(1)
-            if best is None or tag > best[0]:
-                best = (tag, p)
-    return best[1] if best else None
+        if not m:
+            continue
+        tag = m.group(1)
+        ext_rank = 1 if p.suffix.lower() == ".parquet" else 0
+        if best is None or (tag, ext_rank) > (best[0], best[1]):
+            best = (tag, ext_rank, p)
+    return best[2] if best else None
 
 
 @st.cache_data(ttl=120, show_spinner=False)
