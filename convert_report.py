@@ -26,11 +26,34 @@ def find_latest_xlsx(folder: Path) -> Path | None:
     return best[1] if best else None
 
 
+def _to_str_keep_na(v: object) -> object:
+    """결측은 그대로 두고 나머지는 문자열로. (timedelta/time/bytes 등 혼합 타입 object 컬럼 대비)"""
+    try:
+        if pd.isna(v):
+            return v
+    except (TypeError, ValueError):
+        pass
+    return str(v)
+
+
+def make_parquet_safe(df: pd.DataFrame) -> pd.DataFrame:
+    """parquet 직렬화가 깨지는 혼합 타입 object 컬럼을 문자열로 정규화(결측 보존).
+
+    앱은 object 컬럼을 모두 문자열 라벨로만 사용하고 숫자 지표는 별도 숫자형 컬럼이므로 안전.
+    `날짜` 는 호출 전에 datetime 으로 변환되어 object 가 아니므로 영향받지 않는다.
+    """
+    for col in df.columns:
+        if df[col].dtype == object:
+            df[col] = df[col].map(_to_str_keep_na)
+    return df
+
+
 def xlsx_to_parquet(xlsx_path: Path, out_path: Path | None = None) -> Path:
     out = out_path or xlsx_path.with_suffix(".parquet")
     df = pd.read_excel(xlsx_path, sheet_name="raw", engine="openpyxl")
     if "날짜" in df.columns:
         df["날짜"] = pd.to_datetime(df["날짜"], errors="coerce")
+    df = make_parquet_safe(df)
     df.to_parquet(out, engine="pyarrow", index=False)
     return out
 
