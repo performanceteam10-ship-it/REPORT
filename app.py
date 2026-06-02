@@ -15,6 +15,7 @@ import pandas as pd
 import plotly.graph_objects as go
 import streamlit as st
 
+from data_access import read_full as _read_parquet_full
 from drive_report import download_drive_file, list_drive_reports
 from madup_api import (
     DEFAULT_BASE as MADUP_API_DEFAULT_BASE,
@@ -72,7 +73,11 @@ def find_latest_report(folder: Path) -> Path | None:
 
 @st.cache_data(ttl=120, show_spinner=False)
 def load_raw(report_path: str) -> pd.DataFrame:
-    df = pd.read_excel(Path(report_path), sheet_name="raw", engine="openpyxl")
+    p = Path(report_path)
+    if p.suffix.lower() == ".parquet":
+        df = _read_parquet_full(str(p))
+    else:
+        df = pd.read_excel(p, sheet_name="raw", engine="openpyxl")
     df["날짜"] = pd.to_datetime(df["날짜"], errors="coerce")
     return df
 
@@ -761,7 +766,8 @@ def main() -> None:
                     except Exception as e:
                         st.error(f"Madup API: {e}")
                         st.stop()
-                    path = Path(tempfile.gettempdir()) / "sn_madup_latest.xlsx"
+                    ext = ".parquet" if str(dp).lower().endswith(".parquet") else ".xlsx"
+                    path = Path(tempfile.gettempdir()) / f"sn_madup_latest{ext}"
                     path.write_bytes(data)
                     st.caption(f"열림: `{dp}`")
                 else:
@@ -787,7 +793,8 @@ def main() -> None:
                     if data is None:
                         st.error("해당 날짜 파일이 없거나 API 오류(파일명 공백/하이픈 형식 모두 시도함).")
                         st.stop()
-                    path = Path(tempfile.gettempdir()) / f"sn_madup_{pick}.xlsx"
+                    ext = ".parquet" if str(dp).lower().endswith(".parquet") else ".xlsx"
+                    path = Path(tempfile.gettempdir()) / f"sn_madup_{pick}{ext}"
                     path.write_bytes(data)
                     st.caption(f"열림: `{dp}`")
             elif single_path:
@@ -796,7 +803,8 @@ def main() -> None:
                 except Exception as e:
                     st.error(f"Madup API: {e}")
                     st.stop()
-                path = Path(tempfile.gettempdir()) / "sn_madup_single.xlsx"
+                ext = ".parquet" if single_path.lower().endswith(".parquet") else ".xlsx"
+                path = Path(tempfile.gettempdir()) / f"sn_madup_single{ext}"
                 path.write_bytes(data)
                 st.caption(f"열림: `{single_path}`")
             else:
@@ -826,7 +834,8 @@ def main() -> None:
                 _tag, file_id, name = listing[0]
 
             data = _drive_cached_bytes(file_id, sa_json)
-            path = Path(tempfile.gettempdir()) / f"sn_drive_{file_id}.xlsx"
+            ext = ".parquet" if str(name).lower().endswith(".parquet") else ".xlsx"
+            path = Path(tempfile.gettempdir()) / f"sn_drive_{file_id}{ext}"
             path.write_bytes(data)
             st.caption(f"열림: `{name}`")
         else:
