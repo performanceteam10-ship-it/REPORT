@@ -3,6 +3,19 @@
 Streamlit 앱. **Madup API**(Dropbox HTTP 다운로드), **구글 드라이브**(서비스 계정), 또는 로컬 폴더에서 `Madup_Sharkninja_Daily Report_YYMMDD.xlsx` 를 읽습니다.  
 우선순위: **Madup API → 구글 드라이브 → 로컬 폴더** (Secrets에 Madup 키가 있으면 Madup을 사용).
 
+## ⚡ 빠른 로딩: 엑셀 → Parquet 변환 (권장)
+
+대용량 xlsx 는 앱이 열릴 때 `openpyxl` 파싱이 느립니다. 업로드 전에 **parquet 로 한 번 변환**하면
+앱은 DuckDB 로 훨씬 빠르게 읽습니다(다운로드 용량도 크게 감소).
+
+1. 평소처럼 `Madup_Sharkninja_Daily Report_YYMMDD.xlsx` 를 리포트 폴더에 저장
+2. **`convert_report.bat` 더블클릭** → 같은 폴더에 `...YYMMDD.parquet` 생성
+3. Dropbox 가 자동 동기화 → 앱이 자동으로 parquet 사용
+
+- 같은 날짜의 parquet 가 있으면 우선 사용하고, 없으면 기존 xlsx 로 폴백합니다(무중단).
+- 변환기는 폴더의 **최신 xlsx 1개**만 변환합니다. 다른 폴더를 쓰려면
+  `python convert_report.py "폴더경로"` 로 실행하세요.
+
 ## 내 PC에서만 돌리고 팀에게 보여주기 (가장 단순)
 
 1. 이 폴더에서 `pip install -r requirements.txt` (최초 1회)
