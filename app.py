@@ -45,13 +45,26 @@ COL_GM_REV   = "g마켓_매출"
 COL_PRODUCT  = "실 전환 발생 상품"
 COL_PROMO    = "프로모션명"
 
-# ── KPI 목표 ─────────────────────────────────────────────────────────────────
-KPI = {
-    "네이버 브랜드스토어": 2_143_260_060,
-    "쿠팡":               835_011_825,
-    "G마켓":              58_287_235,
-}
+KPI_FILE = Path(__file__).parent / "KPI.xlsx"
 HIER_COLS = ["매체상세", "캠페인", "그룹", "소재/키워드", COL_PRODUCT]
+
+
+@st.cache_data(ttl=300, show_spinner=False)
+def load_kpi() -> dict[str, dict]:
+    """KPI.xlsx 에서 채널별 목표 로드. {채널: {목표비용, 목표매출, 목표ROAS}}"""
+    if not KPI_FILE.exists():
+        return {}
+    df = pd.read_excel(KPI_FILE)
+    df.columns = df.columns.str.strip()
+    result = {}
+    for _, row in df.iterrows():
+        ch = str(row.iloc[0]).strip()
+        result[ch] = {
+            "목표비용": float(row.get("목표 비용", row.iloc[1]) or 0),
+            "목표매출": float(row.get("목표 매출", row.iloc[2]) or 0),
+            "목표ROAS": float(row.get("목표 ROAS", row.iloc[3]) or 0),
+        }
+    return result
 
 
 # ── 파일 유틸 ─────────────────────────────────────────────────────────────────
@@ -199,19 +212,32 @@ def agg_monthly(raw: pd.DataFrame, d_max: pd.Timestamp) -> dict:
 
 
 # ── KPI 달성률 ────────────────────────────────────────────────────────────────
-def kpi_achievement(raw: pd.DataFrame, d_max: pd.Timestamp) -> dict[str, tuple[float, int]]:
+def kpi_achievement(raw: pd.DataFrame, d_max: pd.Timestamp) -> dict[str, tuple[float, float]]:
+    kpi = load_kpi()
     first = pd.Timestamp(d_max.year, d_max.month, 1)
     mask  = (raw["날짜"].dt.normalize() >= first) & (raw["날짜"].dt.normalize() <= pd.Timestamp(d_max).normalize())
     sub   = raw.loc[mask]
-    naver_mask = sub["채널"].astype(str).str.contains("네이버", na=False, case=False)
-    naver = float(sub.loc[naver_mask, COL_REV_SS].sum())
-    coup  = float(sub[COL_COUP_REV].sum()) if COL_COUP_REV in sub.columns else 0.0
-    gm    = float(sub[COL_GM_REV].sum())   if COL_GM_REV   in sub.columns else 0.0
-    return {
-        "네이버 브랜드스토어": (naver, KPI["네이버 브랜드스토어"]),
-        "쿠팡":               (coup,  KPI["쿠팡"]),
-        "G마켓":              (gm,    KPI["G마켓"]),
-    }
+
+    result = {}
+    for ch, targets in kpi.items():
+        target_rev = targets["목표매출"]
+        ch_key = ch.lower().strip()
+        if ch_key == "네이버브랜드스토어" or "naver" in ch_key or "네이버" in ch_key:
+            naver_mask = sub["채널"].astype(str).str.contains("네이버", na=False, case=False)
+            achieved = float(sub.loc[naver_mask, COL_REV_SS].sum())
+        elif ch_key == "쿠팡" or "coup" in ch_key:
+            achieved = float(sub[COL_COUP_REV].sum()) if COL_COUP_REV in sub.columns else 0.0
+        elif ch_key == "othermall":
+            # 네이버/쿠팡 제외한 나머지 채널 SS 매출 합산
+            other_mask = (
+                ~sub["채널"].astype(str).str.contains("네이버", na=False, case=False) &
+                ~sub["채널"].astype(str).str.contains("쿠팡", na=False, case=False)
+            )
+            achieved = float(sub.loc[other_mask, COL_REV_SS].sum())
+        else:
+            achieved = 0.0
+        result[ch] = (achieved, target_rev)
+    return result
 
 
 def kpi_bar_html(name: str, achieved: float, target: int) -> str:
