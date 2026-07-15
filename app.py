@@ -1032,8 +1032,7 @@ def main() -> None:
             "ROAS (%)":   [fp(mtot["ROAS_SS"]), fp(mtot["ROAS_DB"])],
         }
         st.dataframe(
-            pd.DataFrame(tbl_data).set_index("기준"),
-            use_container_width=True, height=110,
+            pd.DataFrame(tbl_data).set_index("기준"), height=110,
         )
 
         # ── 일자별 상세 (스마트스토어 기준) ──
@@ -1057,7 +1056,7 @@ def main() -> None:
                     "DB ROAS": fp(a["ROAS_DB"]),
                 })
             daily_df = pd.DataFrame(daily_rows).set_index("날짜")
-            st.dataframe(daily_df, use_container_width=True, height=min(len(daily_rows) * 36 + 40, 600))
+            st.dataframe(daily_df, height=min(len(daily_rows) * 36 + 40, 600))
 
         st.divider()
 
@@ -1124,8 +1123,7 @@ def main() -> None:
             "ROAS (%)":  [fp(cur["ROAS_SS"]), fp(cur["ROAS_DB"])],
         }
         st.dataframe(
-            pd.DataFrame(base_tbl).set_index("기준"),
-            use_container_width=True, height=110,
+            pd.DataFrame(base_tbl).set_index("기준"), height=110,
         )
 
         # 비교 기간 증감 표
@@ -1166,8 +1164,7 @@ def main() -> None:
             ],
         }
         st.dataframe(
-            pd.DataFrame(delta_tbl).set_index("기준"),
-            use_container_width=True, height=110,
+            pd.DataFrame(delta_tbl).set_index("기준"), height=110,
         )
 
         st.divider()
@@ -1292,7 +1289,7 @@ def main() -> None:
             disp_total["구매 (건)"] = disp_total["구매 (건)"].map(lambda x: fm(float(x)))
             disp_total.index = range(1, len(disp_total) + 1)
             disp_total.index.name = "순위"
-            st.dataframe(disp_total, use_container_width=True, height=390)
+            st.dataframe(disp_total, height=390)
 
             st.divider()
 
@@ -1332,7 +1329,7 @@ def main() -> None:
                     cum_disp["구매 (건)"] = cum_disp["구매 (건)"].map(lambda x: fm(float(x)))
                     cum_disp.index = range(1, len(cum_disp) + 1)
                     cum_disp.index.name = "순위"
-                    st.dataframe(cum_disp, use_container_width=True, height=390)
+                    st.dataframe(cum_disp, height=390)
 
                 with col_daily:
                     st.markdown(f"**전일 매출 TOP10** ({d_max_s})")
@@ -1349,7 +1346,7 @@ def main() -> None:
                     day_disp["구매 (건)"] = day_disp["구매 (건)"].map(lambda x: fm(float(x)))
                     day_disp.index = range(1, len(day_disp) + 1)
                     day_disp.index.name = "순위"
-                    st.dataframe(day_disp, use_container_width=True, height=390)
+                    st.dataframe(day_disp, height=390)
 
                 # ── 전일 대비 상승/하락 TOP10 ──
                 st.markdown(f"**전일 대비 상품 변동** ({d_max_s} vs {prev_s})")
@@ -1373,7 +1370,7 @@ def main() -> None:
                             up_disp["매출 증감"] = up_disp["매출 증감"].map(lambda x: f"+{fm(float(x))}")
                             up_disp["구매 증감"] = up_disp["구매 증감"].map(lambda x: f"{float(x):+,.0f}")
                             up_disp.index = range(1, len(up_disp) + 1)
-                            st.dataframe(up_disp, use_container_width=True, height=390)
+                            st.dataframe(up_disp, height=390)
 
                     with col_dn:
                         st.markdown("🔻 **매출 하락 TOP10**")
@@ -1387,7 +1384,7 @@ def main() -> None:
                             dn_disp["매출 증감"] = dn_disp["매출 증감"].map(lambda x: fm(float(x)))
                             dn_disp["구매 증감"] = dn_disp["구매 증감"].map(lambda x: f"{float(x):+,.0f}")
                             dn_disp.index = range(1, len(dn_disp) + 1)
-                            st.dataframe(dn_disp, use_container_width=True, height=390)
+                            st.dataframe(dn_disp, height=390)
 
                 st.divider()
 
@@ -1435,7 +1432,7 @@ def main() -> None:
         for c in ["CTR", "SS ROAS", "DB ROAS"]:
             if c in disp_mcum.columns:
                 disp_mcum[c] = disp_mcum[c].map(lambda x: f"{float(x):.1f}%")
-        st.dataframe(disp_mcum, use_container_width=True, height=min(len(disp_mcum) * 36 + 40, 600))
+        st.dataframe(disp_mcum, height=min(len(disp_mcum) * 36 + 40, 600))
 
         st.divider()
 
@@ -1481,7 +1478,7 @@ def main() -> None:
                         if c in cg_d.columns:
                             cg_d[c] = cg_d[c].map(lambda x: f"{float(x):.1f}%")
                     cg_d.index = range(1, len(cg_d) + 1)
-                    st.dataframe(cg_d, use_container_width=True, height=min(len(cg_d) * 36 + 40, 500))
+                    st.dataframe(cg_d, height=min(len(cg_d) * 36 + 40, 500))
 
             # ── 캠페인/그룹 전일 대비 증감 ──
             cg_cmp = two_day_compare(msub, ["캠페인", "그룹"], d_max, d_prev_file)
@@ -1498,7 +1495,7 @@ def main() -> None:
                             show.append(c)
                             cg_s[c] = cg_s[c].map(lambda x: f"{float(x):.1f}%")
                     cg_s.index = range(1, len(cg_s) + 1)
-                    st.dataframe(cg_s[show], use_container_width=True, height=min(len(cg_s) * 36 + 40, 500))
+                    st.dataframe(cg_s[show], height=min(len(cg_s) * 36 + 40, 500))
 
             # ── 키워드별 성과 (파워링크/쇼핑검색/브랜드검색/신제품검색) ──
             if media in KEYWORD_MEDIAS and COL_SS_KW in msub.columns:
@@ -1522,7 +1519,7 @@ def main() -> None:
                                 kd[c] = kd[c].map(lambda x: fm(float(x)))
                             kd["SS ROAS"] = kd["SS ROAS"].map(lambda x: f"{float(x):.1f}%")
                             kd.index = range(1, len(kd) + 1)
-                            st.dataframe(kd, use_container_width=True, height=min(len(kd) * 36 + 40, 500))
+                            st.dataframe(kd, height=min(len(kd) * 36 + 40, 500))
                         with col_kw_chg:
                             st.markdown(f"**전일 대비 증감** ({last_label} vs {prev_label})")
                             kw_cmp = two_day_compare_ss(kw_sub, [COL_SS_KW], d_max, d_prev_file)
@@ -1534,7 +1531,7 @@ def main() -> None:
                                 kw_show["매출 증감"] = kw_show["매출 증감"].map(lambda x: f"{float(x):+,.0f}")
                                 kw_show["구매 증감"] = kw_show["구매 증감"].map(lambda x: f"{float(x):+,.0f}")
                                 kw_show.index = range(1, len(kw_show) + 1)
-                                st.dataframe(kw_show, use_container_width=True, height=min(len(kw_show) * 36 + 40, 500))
+                                st.dataframe(kw_show, height=min(len(kw_show) * 36 + 40, 500))
                             else:
                                 st.caption("증감 데이터 없음")
 
@@ -1573,7 +1570,7 @@ def main() -> None:
                             for c in ["SS ROAS", "DB ROAS"]:
                                 cd[c] = cd[c].map(lambda x: f"{float(x):.1f}%")
                             cd.index = range(1, len(cd) + 1)
-                            st.dataframe(cd, use_container_width=True, height=min(len(cd) * 36 + 40, 500))
+                            st.dataframe(cd, height=min(len(cd) * 36 + 40, 500))
                         with col_cr_chg:
                             st.markdown(f"**전일 대비 증감** ({last_label} vs {prev_label}, DB 기준)")
                             cr_cmp = two_day_compare(cr_filtered, ["소재/키워드"], d_max, d_prev_file)
@@ -1585,7 +1582,7 @@ def main() -> None:
                                 cr_show["매출 증감"] = cr_show["매출 증감"].map(lambda x: f"{float(x):+,.0f}")
                                 cr_show["구매 증감"] = cr_show["구매 증감"].map(lambda x: f"{float(x):+,.0f}")
                                 cr_show.index = range(1, len(cr_show) + 1)
-                                st.dataframe(cr_show, use_container_width=True, height=min(len(cr_show) * 36 + 40, 500))
+                                st.dataframe(cr_show, height=min(len(cr_show) * 36 + 40, 500))
                             else:
                                 st.caption("증감 데이터 없음")
 
