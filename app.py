@@ -7,7 +7,9 @@ from __future__ import annotations
 import json
 import os
 import re
+import sys
 import tempfile
+import traceback
 from datetime import datetime, timedelta
 from pathlib import Path
 
@@ -819,6 +821,18 @@ def media_daily_pivot(raw: pd.DataFrame) -> pd.DataFrame:
 # MAIN
 # ══════════════════════════════════════════════════════════════════════════════
 def main() -> None:
+    try:
+        _main_inner()
+    except Exception as _fatal:
+        print("=== FATAL MAIN ERROR ===", file=sys.stderr)
+        traceback.print_exc(file=sys.stderr)
+        try:
+            st.exception(_fatal)
+        except Exception:
+            pass
+
+
+def _main_inner() -> None:
     st.set_page_config(page_title="SharkNinja Daily", layout="wide", initial_sidebar_state="expanded")
 
     with st.sidebar:
@@ -1650,4 +1664,9 @@ def main() -> None:
 
 
 if __name__ == "__main__":
-    main()
+    try:
+        main()
+    except Exception as _fatal:
+        print("=== FATAL APP ERROR ===", file=sys.stderr)
+        traceback.print_exc(file=sys.stderr)
+        st.exception(_fatal)
