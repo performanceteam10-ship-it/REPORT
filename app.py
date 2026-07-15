@@ -229,7 +229,8 @@ def kpi_achievement(raw: pd.DataFrame, d_max: pd.Timestamp) -> dict[str, tuple[f
             naver_mask = sub["채널"].astype(str).str.contains("네이버", na=False, case=False)
             achieved = float(sub.loc[naver_mask, COL_REV_SS].sum())
         elif ch_key == "쿠팡" or "coup" in ch_key:
-            achieved = float(sub[COL_COUP_REV].sum()) if COL_COUP_REV in sub.columns else 0.0
+            coup_mask = sub["채널"].astype(str).str.contains("쿠팡", na=False, case=False)
+            achieved = float(sub.loc[coup_mask, COL_REV_SS].sum())
         elif ch_key == "othermall":
             # 네이버/쿠팡 제외한 나머지 채널 SS 매출 합산
             other_mask = (
