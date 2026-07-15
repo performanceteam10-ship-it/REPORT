@@ -1244,12 +1244,16 @@ def main() -> None:
             d_max_s = d_max.strftime("%m/%d")
             prev_s  = d_prev_file.strftime("%m/%d")
 
-            # ── 1. 전체 기간 브랜드스토어 상품 매출 누적 TOP10 ──
-            st.subheader("📦 전체 기간 네이버 브랜드스토어 상품 매출 TOP10 (SS 기준)")
-            st.caption(f"기간: {d_min_s} – {d_max_s} 누적")
+            # ── 1. 당월 브랜드스토어 상품 매출 누적 TOP10 ──
+            first_of_m_prod = pd.Timestamp(d_max.year, d_max.month, 1)
+            m_start_s = first_of_m_prod.strftime("%m/%d")
+            prod_m_df = prod_df[prod_df["d"] >= first_of_m_prod]
+
+            st.subheader(f"📦 {d_max.month}월 네이버 브랜드스토어 상품 매출 TOP10 (SS 기준)")
+            st.caption(f"기간: {m_start_s} – {d_max_s} 누적")
 
             total_prod = (
-                prod_df.groupby(COL_PRODUCT, dropna=False)
+                prod_m_df.groupby(COL_PRODUCT, dropna=False)
                 .agg({COL_REV_SS: "sum", COL_BUY_SS: "sum"})
                 .sort_values(COL_REV_SS, ascending=False)
                 .head(10)
@@ -1291,6 +1295,42 @@ def main() -> None:
             disp_total.index.name = "순위"
             st.dataframe(disp_total, height=390)
 
+            # ── 1-2. 전일 대비 상품 매출 변동 (전체) ──
+            st.markdown(f"#### 📈 전일 대비 상품 매출 변동 ({d_max_s} vs {prev_s})")
+            all_prod_cmp = two_day_compare_ss(prod_df, [COL_PRODUCT], d_max, d_prev_file)
+            if not all_prod_cmp.empty:
+                all_prod_cmp = all_prod_cmp[
+                    (all_prod_cmp[COL_PRODUCT] != "(미입력)") &
+                    (all_prod_cmp[COL_PRODUCT].astype(str).str.strip() != "-")
+                ]
+                col_up2, col_dn2 = st.columns(2)
+                with col_up2:
+                    st.markdown("🔺 **매출 상승 TOP10**")
+                    up2 = all_prod_cmp[all_prod_cmp["매출_증감"] > 0].head(10).copy()
+                    if up2.empty:
+                        st.caption("상승 상품 없음")
+                    else:
+                        up2_disp = up2[[COL_PRODUCT, f"{COL_REV_SS}_전일", "매출_증감", "구매_증감"]].rename(
+                            columns={COL_PRODUCT: "상품명", f"{COL_REV_SS}_전일": "전일매출", "매출_증감": "증감(원)", "구매_증감": "구매증감(건)"}
+                        )
+                        up2_disp["전일매출"] = up2_disp["전일매출"].map(lambda x: fm(float(x)))
+                        up2_disp["증감(원)"] = up2_disp["증감(원)"].map(lambda x: f"+{fm(float(x))}")
+                        up2_disp.index = range(1, len(up2_disp) + 1)
+                        st.dataframe(up2_disp, height=390)
+                with col_dn2:
+                    st.markdown("🔻 **매출 하락 TOP10**")
+                    dn2 = all_prod_cmp[all_prod_cmp["매출_증감"] < 0].sort_values("매출_증감").head(10).copy()
+                    if dn2.empty:
+                        st.caption("하락 상품 없음")
+                    else:
+                        dn2_disp = dn2[[COL_PRODUCT, f"{COL_REV_SS}_전일", "매출_증감", "구매_증감"]].rename(
+                            columns={COL_PRODUCT: "상품명", f"{COL_REV_SS}_전일": "전일매출", "매출_증감": "증감(원)", "구매_증감": "구매증감(건)"}
+                        )
+                        dn2_disp["전일매출"] = dn2_disp["전일매출"].map(lambda x: fm(float(x)))
+                        dn2_disp["증감(원)"] = dn2_disp["증감(원)"].map(lambda x: fm(float(x)))
+                        dn2_disp.index = range(1, len(dn2_disp) + 1)
+                        st.dataframe(dn2_disp, height=390)
+
             st.divider()
 
             # ── 2. 매체상세별 누적 TOP10 + 전일 TOP10 ──
@@ -1313,12 +1353,14 @@ def main() -> None:
                     if sn_media_f != "전체":
                         m_sub = m_sub[m_sub[COL_SN].astype(str) == sn_media_f]
 
+                m_sub_m = m_sub[m_sub["d"] >= first_of_m_prod]
+
                 col_cum, col_daily = st.columns(2)
 
                 with col_cum:
-                    st.markdown(f"**누적 매출 TOP10** ({d_min_s} – {d_max_s})")
+                    st.markdown(f"**누적 매출 TOP10** ({m_start_s} – {d_max_s})")
                     cum_top = (
-                        m_sub.groupby(COL_PRODUCT, dropna=False)
+                        m_sub_m.groupby(COL_PRODUCT, dropna=False)
                         .agg({COL_REV_SS: "sum", COL_BUY_SS: "sum"})
                         .sort_values(COL_REV_SS, ascending=False)
                         .head(10)
