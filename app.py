@@ -284,7 +284,7 @@ def make_roas_cost_chart(raw: pd.DataFrame, last_day: pd.Timestamp, n: int = 7) 
     labels, roas_vals, cost_vals = [], [], []
     for d in use:
         a = agg_range(raw, d, d)
-        labels.append(pd.Timestamp(d).strftime("%m.%d"))
+        labels.append(pd.Timestamp(d).strftime("%m/%d"))
         roas_vals.append(round(a["ROAS_SS"], 1))
         cost_vals.append(round(a["비용"] / 10_000, 1))
 
@@ -633,6 +633,23 @@ def summary_depth_comment(raw: pd.DataFrame, d_last: pd.Timestamp, d_prev: pd.Ti
                                 f"- {pr_dir} {pname} : 매출 **{rr['매출_증감']:+,.0f}원**, "
                                 f"구매 {rr.get('구매_증감', 0):+,.0f}건"
                             )
+
+            # 네이버 성과형디스플레이광고 → 하위 3개 매체 세부 내역 (DB 기준)
+            DISPLAY_SUB_MEDIAS = ["네이버 메인배너", "네이버 쇼핑프로모션", "네이버 스마트채널"]
+            if "성과형디스플레이" in str(media):
+                display_sub = r_copy[
+                    r_copy["매체상세"].astype(str).isin(DISPLAY_SUB_MEDIAS)
+                ]
+                m_display = two_day_compare(display_sub, ["매체상세"], d_last, d_prev)
+                if not m_display.empty:
+                    lines.append("\n**네이버 성과형디스플레이 매체별 내역 (DB 기준):**")
+                    for _, rr in m_display.iterrows():
+                        sub_name = str(rr.get("매체상세", ""))
+                        sub_dir = "▲" if rr["매출_증감"] >= 0 else "▼"
+                        lines.append(
+                            f"- {sub_dir} {sub_name} : 매출 **{rr['매출_증감']:+,.0f}원**, "
+                            f"ROAS {rr['ROAS%_전일']:.1f}% ({rr['ROAS%p_차이']:+.1f}p)"
+                        )
 
             # 캠페인/그룹 (DB 기준)
             m_cg = two_day_compare(sub, ["캠페인", "그룹"], d_last, d_prev)
