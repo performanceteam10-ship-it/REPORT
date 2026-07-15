@@ -1199,7 +1199,7 @@ def main() -> None:
         chart_to   = pd.Timestamp(chart_use[-1]).strftime("%m/%d") if chart_use else ""
         st.caption(f"막대: ROAS (%)  |  선: 비용 (만원)  |  기간: {chart_from} – {chart_to} ({len(chart_use)}일)")
         fig = make_roas_cost_chart(raw_df, chart_e, len(chart_use) if chart_use else 7)
-        st.plotly_chart(fig, use_container_width=True)
+        st.plotly_chart(fig)
 
         st.divider()
 
@@ -1285,7 +1285,7 @@ def main() -> None:
                 yaxis=dict(title=None, tickfont=dict(size=11)),
                 margin=dict(l=10, r=120, t=10, b=40),
             )
-            st.plotly_chart(fig_prod, use_container_width=True)
+            st.plotly_chart(fig_prod)
 
             disp_total = total_prod[["상품명", "매출 (원)", "구매 (건)"]].copy()
             disp_total["매출 (원)"] = disp_total["매출 (원)"].map(lambda x: fm(float(x)))
