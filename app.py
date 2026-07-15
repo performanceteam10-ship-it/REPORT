@@ -537,79 +537,92 @@ def summary_depth_comment(raw: pd.DataFrame, d_last: pd.Timestamp, d_prev: pd.Ti
         f"> ROAS(SS): **{cur['ROAS_SS']:.1f}%** ({cur['ROAS_SS']-prev['ROAS_SS']:+.1f}p)"
     )
 
-    # ── 3) 매체상세별 데일리 코멘트 (SS 기준) ──
-    m_media_ss = two_day_compare_ss(raw, ["매체상세"], d_last, d_prev)
-    if m_media_ss.empty:
-        return "\n".join(lines)
-
-    top_medias = m_media_ss.head(3)["매체상세"].tolist()
-
+    # ── 3) 채널별 데일리 코멘트 ──
     r_copy = raw.copy()
     r_copy["d"] = r_copy["날짜"].dt.normalize()
 
-    is_coupang = lambda name: "쿠팡" in str(name)
+    def _channel_section(title: str, channel_df: pd.DataFrame, emoji: str) -> None:
+        """채널 데이터프레임으로 매체상세별 영향도 코멘트 생성."""
+        m_ss = two_day_compare_ss(channel_df, ["매체상세"], d_last, d_prev)
+        if m_ss.empty:
+            lines.append(f"\n---\n#### {emoji} {title}  ({last_s} vs {prev_s})")
+            lines.append("_데이터 없음_\n")
+            return
 
-    lines.append(f"\n---\n#### 📋 데일리 코멘트  ({last_s} vs {prev_s})")
-    lines.append(f"매출 영향도 큰 매체상세 (SS 기준): **{', '.join(top_medias)}**\n")
+        ch_cur  = agg_range(channel_df, d_last, d_last)
+        ch_prev = agg_range(channel_df, d_prev, d_prev)
+        rev_d = ch_cur["SS_매출"] - ch_prev["SS_매출"]
+        roas_d = ch_cur["ROAS_SS"] - ch_prev["ROAS_SS"]
+        dir_emoji = "📈" if rev_d >= 0 else "📉"
 
-    for rank, media in enumerate(top_medias, 1):
-        mr = m_media_ss[m_media_ss["매체상세"] == media].iloc[0]
-        delta_dir = "증가" if mr["매출_증감"] >= 0 else "감소"
-        ss_rev = mr[f"{COL_REV_SS}_전일"]
-        ss_roas = mr["ROAS%_전일"]
-        ss_roas_d = mr["ROAS%p_차이"]
-        cost_val = mr.get(f"{COL_COST}_전일", 0)
-        cost_d = mr.get("비용_증감", 0)
-
+        lines.append(f"\n---\n#### {emoji} {title}  ({last_s} vs {prev_s})")
         lines.append(
-            f"##### {rank}. {media}  ({delta_dir})\n"
-            f"**[SS 기준]** 매출 **{ss_rev:,.0f}원** ({mr['매출_증감']:+,.0f}원) · "
-            f"비용 {cost_val:,.0f}원 ({cost_d:+,.0f}원) · "
-            f"ROAS {ss_roas:.1f}% ({ss_roas_d:+.1f}p)"
+            f"{dir_emoji} SS 매출 **{ch_cur['SS_매출']:,.0f}원** ({rev_d:+,.0f}원) · "
+            f"비용 **{ch_cur['비용']:,.0f}원** · ROAS **{ch_cur['ROAS_SS']:.1f}%** ({roas_d:+.1f}p)\n"
         )
 
-        sub = r_copy[r_copy["매체상세"].astype(str) == str(media)]
+        top_medias = m_ss.head(3)["매체상세"].tolist()
+        for rank, media in enumerate(top_medias, 1):
+            mr = m_ss[m_ss["매체상세"] == media].iloc[0]
+            delta_dir = "증가" if mr["매출_증감"] >= 0 else "감소"
+            ss_rev = mr[f"{COL_REV_SS}_전일"]
+            cost_val = mr.get(f"{COL_COST}_전일", 0)
+            cost_d = mr.get("비용_증감", 0)
 
-        # 실전환 광고 상품 (쿠팡 제외, SS 기준)
-        if not is_coupang(media):
-            prod_sub = sub[
-                sub[COL_PRODUCT].notna() &
-                (sub[COL_PRODUCT].astype(str).str.strip() != "") &
-                (sub[COL_PRODUCT].astype(str).str.strip() != "-") &
-                (sub[COL_PRODUCT].astype(str) != "(미입력)")
-            ]
-            if not prod_sub.empty:
-                m_prod = two_day_compare_ss(prod_sub, [COL_PRODUCT], d_last, d_prev)
-                if not m_prod.empty:
-                    top_pr = m_prod.head(3)
-                    lines.append("\n**실전환 광고 상품 (SS 기준):**")
-                    for _, rr in top_pr.iterrows():
-                        pname = str(rr.get(COL_PRODUCT, ""))
-                        if len(pname) > 50:
-                            pname = pname[:50] + "…"
-                        pr_dir = "▲" if rr["매출_증감"] >= 0 else "▼"
-                        lines.append(
-                            f"- {pr_dir} {pname} : 매출 **{rr['매출_증감']:+,.0f}원**, "
-                            f"구매 {rr.get('구매_증감', 0):+,.0f}건"
-                        )
+            lines.append(
+                f"##### {rank}. {media}  ({delta_dir})\n"
+                f"**[SS 기준]** 매출 **{ss_rev:,.0f}원** ({mr['매출_증감']:+,.0f}원) · "
+                f"비용 {cost_val:,.0f}원 ({cost_d:+,.0f}원) · "
+                f"ROAS {mr['ROAS%_전일']:.1f}% ({mr['ROAS%p_차이']:+.1f}p)"
+            )
 
-        # 캠페인/그룹 (DB 기준, 참고)
-        m_cg = two_day_compare(sub, ["캠페인", "그룹"], d_last, d_prev)
-        if not m_cg.empty:
-            top_cg = m_cg.head(3)
-            lines.append("\n**참고 – 캠페인/그룹 영향 (DB 기준):**")
-            for _, rr in top_cg.iterrows():
-                camp = str(rr.get("캠페인", ""))
-                grp  = str(rr.get("그룹", ""))
-                label_parts = [p for p in [camp, grp] if p and p not in ("(미입력)", "nan")]
-                lbl = " > ".join(label_parts) if label_parts else "(기타)"
-                cg_dir = "▲" if rr["매출_증감"] >= 0 else "▼"
-                lines.append(
-                    f"- {cg_dir} {lbl} : 매출 **{rr['매출_증감']:+,.0f}원**, "
-                    f"ROAS {rr['ROAS%_전일']:.1f}% ({rr['ROAS%p_차이']:+.1f}p)"
-                )
+            sub = r_copy[r_copy["매체상세"].astype(str) == str(media)]
 
-        lines.append("")
+            # 실전환 상품 (쿠팡 제외, SS 기준)
+            if "쿠팡" not in str(media):
+                prod_sub = sub[
+                    sub[COL_PRODUCT].notna() &
+                    (sub[COL_PRODUCT].astype(str).str.strip() != "") &
+                    (sub[COL_PRODUCT].astype(str).str.strip() != "-") &
+                    (sub[COL_PRODUCT].astype(str) != "(미입력)")
+                ]
+                if not prod_sub.empty:
+                    m_prod = two_day_compare_ss(prod_sub, [COL_PRODUCT], d_last, d_prev)
+                    if not m_prod.empty:
+                        lines.append("\n**실전환 광고 상품 (SS 기준):**")
+                        for _, rr in m_prod.head(3).iterrows():
+                            pname = str(rr.get(COL_PRODUCT, ""))
+                            if len(pname) > 50:
+                                pname = pname[:50] + "…"
+                            pr_dir = "▲" if rr["매출_증감"] >= 0 else "▼"
+                            lines.append(
+                                f"- {pr_dir} {pname} : 매출 **{rr['매출_증감']:+,.0f}원**, "
+                                f"구매 {rr.get('구매_증감', 0):+,.0f}건"
+                            )
+
+            # 캠페인/그룹 (DB 기준)
+            m_cg = two_day_compare(sub, ["캠페인", "그룹"], d_last, d_prev)
+            if not m_cg.empty:
+                lines.append("\n**참고 – 캠페인/그룹 영향 (DB 기준):**")
+                for _, rr in m_cg.head(3).iterrows():
+                    camp = str(rr.get("캠페인", ""))
+                    grp  = str(rr.get("그룹", ""))
+                    lbl_parts = [p for p in [camp, grp] if p and p not in ("(미입력)", "nan")]
+                    lbl = " > ".join(lbl_parts) if lbl_parts else "(기타)"
+                    cg_dir = "▲" if rr["매출_증감"] >= 0 else "▼"
+                    lines.append(
+                        f"- {cg_dir} {lbl} : 매출 **{rr['매출_증감']:+,.0f}원**, "
+                        f"ROAS {rr['ROAS%_전일']:.1f}% ({rr['ROAS%p_차이']:+.1f}p)"
+                    )
+            lines.append("")
+
+    # 네이버브랜드스토어 채널
+    naver_df = r_copy[r_copy["채널"].astype(str).str.strip() == "네이버브랜드스토어"] if "채널" in r_copy.columns else r_copy
+    _channel_section("네이버 브랜드스토어 채널", naver_df, "🟢")
+
+    # 쿠팡 채널
+    coup_df = r_copy[r_copy["채널"].astype(str).str.contains("쿠팡", na=False)] if "채널" in r_copy.columns else pd.DataFrame()
+    _channel_section("쿠팡 채널", coup_df, "🟡")
 
     # ── 4) SUMMARY 표 (SS 기준 매출/ROAS + DB 기준 캠페인 참고) ──
     lines.append(f"---\n#### 📊 SUMMARY  ({last_s} vs {prev_s} 대비)")
@@ -980,14 +993,14 @@ def main() -> None:
                     "노출": fm(a["노출"]),
                     "클릭": fm(a["클릭"]),
                     "CPC": fm(a["CPC"]),
-                    "CTR": fp(a["CTR(%)"], 3) + "%",
+                    "CTR": fp(a["CTR(%)"], 3),
                     "비용": fm(a["비용"]),
                     "SS 구매": fm(a["SS_구매"]),
                     "SS 매출": fm(a["SS_매출"]),
-                    "SS ROAS": fp(a["ROAS_SS"]) + "%",
+                    "SS ROAS": fp(a["ROAS_SS"]),
                     "DB 구매": fm(a["DB_구매"]),
                     "DB 매출": fm(a["DB_매출"]),
-                    "DB ROAS": fp(a["ROAS_DB"]) + "%",
+                    "DB ROAS": fp(a["ROAS_DB"]),
                 })
             daily_df = pd.DataFrame(daily_rows).set_index("날짜")
             st.dataframe(daily_df, use_container_width=True, height=min(len(daily_rows) * 36 + 40, 600))
@@ -1106,14 +1119,32 @@ def main() -> None:
         st.divider()
 
         # ── 4. ROAS/비용 추이 (이중축 차트) ──────────────────────────────────
-        chart_n = 7
         chart_dates = sorted(raw_df["날짜"].dt.normalize().dropna().unique())
-        chart_use = [d for d in chart_dates if d <= d_max][-chart_n:]
+        st.subheader("📊 스마트스토어 ROAS & 비용 추이")
+        chart_col1, chart_col2 = st.columns(2)
+        with chart_col1:
+            chart_start = st.date_input(
+                "시작일",
+                value=(d_max - timedelta(days=6)).to_pydatetime().date(),
+                min_value=dates[0].to_pydatetime().date(),
+                max_value=d_max.to_pydatetime().date(),
+                key="chart_start",
+            )
+        with chart_col2:
+            chart_end = st.date_input(
+                "종료일",
+                value=d_max.to_pydatetime().date(),
+                min_value=dates[0].to_pydatetime().date(),
+                max_value=d_max.to_pydatetime().date(),
+                key="chart_end",
+            )
+        chart_s = pd.Timestamp(chart_start).normalize()
+        chart_e = pd.Timestamp(chart_end).normalize()
+        chart_use = [d for d in chart_dates if chart_s <= d <= chart_e]
         chart_from = pd.Timestamp(chart_use[0]).strftime("%m/%d") if chart_use else ""
         chart_to   = pd.Timestamp(chart_use[-1]).strftime("%m/%d") if chart_use else ""
-        st.subheader(f"📊 스마트스토어 ROAS & 비용 추이  ({chart_from} – {chart_to}, 최근 {chart_n}일)")
-        st.caption("막대: ROAS (%)  |  선: 비용 (만원)")
-        fig = make_roas_cost_chart(raw_df, d_max, chart_n)
+        st.caption(f"막대: ROAS (%)  |  선: 비용 (만원)  |  기간: {chart_from} – {chart_to} ({len(chart_use)}일)")
+        fig = make_roas_cost_chart(raw_df, chart_e, len(chart_use) if chart_use else 7)
         st.plotly_chart(fig, use_container_width=True)
 
         st.divider()
