@@ -54,17 +54,20 @@ def load_kpi() -> dict[str, dict]:
     """KPI.xlsx 에서 채널별 목표 로드. {채널: {목표비용, 목표매출, 목표ROAS}}"""
     if not KPI_FILE.exists():
         return {}
-    df = pd.read_excel(KPI_FILE)
-    df.columns = df.columns.str.strip()
-    result = {}
-    for _, row in df.iterrows():
-        ch = str(row.iloc[0]).strip()
-        result[ch] = {
-            "목표비용": float(row.get("목표 비용", row.iloc[1]) or 0),
-            "목표매출": float(row.get("목표 매출", row.iloc[2]) or 0),
-            "목표ROAS": float(row.get("목표 ROAS", row.iloc[3]) or 0),
-        }
-    return result
+    try:
+        df = pd.read_excel(KPI_FILE, engine="openpyxl")
+        df.columns = df.columns.str.strip()
+        result = {}
+        for _, row in df.iterrows():
+            ch = str(row.iloc[0]).strip()
+            result[ch] = {
+                "목표비용": float(row.iloc[1] or 0),
+                "목표매출": float(row.iloc[2] or 0),
+                "목표ROAS": float(row.iloc[3] or 0),
+            }
+        return result
+    except Exception:
+        return {}
 
 
 # ── 파일 유틸 ─────────────────────────────────────────────────────────────────
@@ -569,6 +572,10 @@ def summary_depth_comment(raw: pd.DataFrame, d_last: pd.Timestamp, d_prev: pd.Ti
 
     def _channel_section(title: str, channel_df: pd.DataFrame, emoji: str) -> None:
         """채널 데이터프레임으로 매체상세별 영향도 코멘트 생성."""
+        if channel_df.empty or "날짜" not in channel_df.columns:
+            lines.append(f"\n---\n#### {emoji} {title}  ({last_s} vs {prev_s})")
+            lines.append("_데이터 없음_\n")
+            return
         m_ss = two_day_compare_ss(channel_df, ["매체상세"], d_last, d_prev)
         if m_ss.empty:
             lines.append(f"\n---\n#### {emoji} {title}  ({last_s} vs {prev_s})")
