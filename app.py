@@ -636,20 +636,23 @@ def summary_depth_comment(raw: pd.DataFrame, d_last: pd.Timestamp, d_prev: pd.Ti
 
             # 네이버 성과형디스플레이광고 → 하위 3개 매체 세부 내역 (DB 기준)
             DISPLAY_SUB_MEDIAS = ["네이버 메인배너", "네이버 쇼핑프로모션", "네이버 스마트채널"]
-            if "성과형디스플레이" in str(media):
-                display_sub = r_copy[
-                    r_copy["매체상세"].astype(str).isin(DISPLAY_SUB_MEDIAS)
-                ]
-                m_display = two_day_compare(display_sub, ["매체상세"], d_last, d_prev)
-                if not m_display.empty:
-                    lines.append("\n**네이버 성과형디스플레이 매체별 내역 (DB 기준):**")
-                    for _, rr in m_display.iterrows():
-                        sub_name = str(rr.get("매체상세", ""))
-                        sub_dir = "▲" if rr["매출_증감"] >= 0 else "▼"
-                        lines.append(
-                            f"- {sub_dir} {sub_name} : 매출 **{rr['매출_증감']:+,.0f}원**, "
-                            f"ROAS {rr['ROAS%_전일']:.1f}% ({rr['ROAS%p_차이']:+.1f}p)"
-                        )
+            try:
+                if "성과형디스플레이" in str(media):
+                    display_sub = r_copy[
+                        r_copy["매체상세"].astype(str).isin(DISPLAY_SUB_MEDIAS)
+                    ]
+                    m_display = two_day_compare(display_sub, ["매체상세"], d_last, d_prev)
+                    if not m_display.empty:
+                        lines.append("\n**네이버 성과형디스플레이 매체별 내역 (DB 기준):**")
+                        for _, rr in m_display.iterrows():
+                            sub_name = str(rr.get("매체상세", ""))
+                            sub_dir = "▲" if rr["매출_증감"] >= 0 else "▼"
+                            lines.append(
+                                f"- {sub_dir} {sub_name} : 매출 **{rr['매출_증감']:+,.0f}원**, "
+                                f"ROAS {rr['ROAS%_전일']:.1f}% ({rr['ROAS%p_차이']:+.1f}p)"
+                            )
+            except Exception:
+                pass
 
             # 캠페인/그룹 (DB 기준)
             m_cg = two_day_compare(sub, ["캠페인", "그룹"], d_last, d_prev)
@@ -1205,9 +1208,12 @@ def main() -> None:
             f"🔍 데일리 코멘트  "
             f"({d_max.strftime('%m/%d')} vs {d_prev_file.strftime('%m/%d')})"
         )
-        with st.spinner("코멘트 생성 중…"):
-            comment = summary_depth_comment(raw_df, d_max, d_prev_file)
-        st.markdown(comment, unsafe_allow_html=True)
+        try:
+            with st.spinner("코멘트 생성 중…"):
+                comment = summary_depth_comment(raw_df, d_max, d_prev_file)
+            st.markdown(comment, unsafe_allow_html=True)
+        except Exception as e:
+            st.error(f"코멘트 생성 오류: {e}")
 
     # ══════════════════════════════════════════════════════════════════════════
     elif page == "상품별":
