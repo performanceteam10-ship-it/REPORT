@@ -653,7 +653,7 @@ def summary_depth_comment(raw: pd.DataFrame, d_last: pd.Timestamp, d_prev: pd.Ti
     # ── 4) SUMMARY 표 (SS 기준 매출/ROAS + DB 기준 캠페인 참고) ──
     lines.append(f"---\n#### 📊 SUMMARY  ({last_s} vs {prev_s} 대비)")
 
-    m_media_db = two_day_compare(raw, ["매체상세"], d_last, d_prev)
+    m_media_ss = two_day_compare_ss(raw, ["매체상세"], d_last, d_prev)
 
     summary_html = (
         '<div style="overflow-x:auto;margin-bottom:12px;">'
