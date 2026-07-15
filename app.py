@@ -520,8 +520,8 @@ def two_day_compare_ss(
     m["비용_증감"] = m[cl] - m[cp] if cl in m.columns and cp in m.columns else 0
     def _ro(rev: float, cost: float) -> float:
         return rev / cost * 100 if cost else 0.0
-    m["ROAS%_전일"]   = m.apply(lambda r: _ro(r[f"{COL_REV_SS}_전일"],   r.get(cl, 0)), axis=1)
-    m["ROAS%_전전일"] = m.apply(lambda r: _ro(r[f"{COL_REV_SS}_전전일"], r.get(cp, 0)), axis=1)
+    m["ROAS%_전일"]   = m.apply(lambda r: _ro(r[f"{COL_REV_SS}_전일"],   r[cl] if cl in r.index else 0), axis=1)
+    m["ROAS%_전전일"] = m.apply(lambda r: _ro(r[f"{COL_REV_SS}_전전일"], r[cp] if cp in r.index else 0), axis=1)
     m["ROAS%p_차이"]  = m["ROAS%_전일"] - m["ROAS%_전전일"]
     m = m.reset_index()
     m["영향도"] = m["매출_증감"].abs()
@@ -1296,40 +1296,49 @@ def main() -> None:
             st.dataframe(disp_total, height=390)
 
             # ── 1-2. 전일 대비 상품 매출 변동 (전체) ──
-            st.markdown(f"#### 📈 전일 대비 상품 매출 변동 ({d_max_s} vs {prev_s})")
-            all_prod_cmp = two_day_compare_ss(prod_df, [COL_PRODUCT], d_max, d_prev_file)
-            if not all_prod_cmp.empty:
-                all_prod_cmp = all_prod_cmp[
-                    (all_prod_cmp[COL_PRODUCT] != "(미입력)") &
-                    (all_prod_cmp[COL_PRODUCT].astype(str).str.strip() != "-")
-                ]
-                col_up2, col_dn2 = st.columns(2)
-                with col_up2:
-                    st.markdown("🔺 **매출 상승 TOP10**")
-                    up2 = all_prod_cmp[all_prod_cmp["매출_증감"] > 0].head(10).copy()
-                    if up2.empty:
-                        st.caption("상승 상품 없음")
-                    else:
-                        up2_disp = up2[[COL_PRODUCT, f"{COL_REV_SS}_전일", "매출_증감", "구매_증감"]].rename(
-                            columns={COL_PRODUCT: "상품명", f"{COL_REV_SS}_전일": "전일매출", "매출_증감": "증감(원)", "구매_증감": "구매증감(건)"}
-                        )
-                        up2_disp["전일매출"] = up2_disp["전일매출"].map(lambda x: fm(float(x)))
-                        up2_disp["증감(원)"] = up2_disp["증감(원)"].map(lambda x: f"+{fm(float(x))}")
-                        up2_disp.index = range(1, len(up2_disp) + 1)
-                        st.dataframe(up2_disp, height=390)
-                with col_dn2:
-                    st.markdown("🔻 **매출 하락 TOP10**")
-                    dn2 = all_prod_cmp[all_prod_cmp["매출_증감"] < 0].sort_values("매출_증감").head(10).copy()
-                    if dn2.empty:
-                        st.caption("하락 상품 없음")
-                    else:
-                        dn2_disp = dn2[[COL_PRODUCT, f"{COL_REV_SS}_전일", "매출_증감", "구매_증감"]].rename(
-                            columns={COL_PRODUCT: "상품명", f"{COL_REV_SS}_전일": "전일매출", "매출_증감": "증감(원)", "구매_증감": "구매증감(건)"}
-                        )
-                        dn2_disp["전일매출"] = dn2_disp["전일매출"].map(lambda x: fm(float(x)))
-                        dn2_disp["증감(원)"] = dn2_disp["증감(원)"].map(lambda x: fm(float(x)))
-                        dn2_disp.index = range(1, len(dn2_disp) + 1)
-                        st.dataframe(dn2_disp, height=390)
+            try:
+                st.markdown(f"#### 📈 전일 대비 상품 매출 변동 ({d_max_s} vs {prev_s})")
+                all_prod_cmp = two_day_compare_ss(prod_df, [COL_PRODUCT], d_max, d_prev_file)
+                if not all_prod_cmp.empty:
+                    all_prod_cmp = all_prod_cmp[
+                        (all_prod_cmp[COL_PRODUCT] != "(미입력)") &
+                        (all_prod_cmp[COL_PRODUCT].astype(str).str.strip() != "-")
+                    ]
+                    col_up2, col_dn2 = st.columns(2)
+                    with col_up2:
+                        st.markdown("🔺 **매출 상승 TOP10**")
+                        up2 = all_prod_cmp[all_prod_cmp["매출_증감"] > 0].head(10).copy()
+                        if up2.empty:
+                            st.caption("상승 상품 없음")
+                        else:
+                            rev_col_key = f"{COL_REV_SS}_전일"
+                            up2_cols = [COL_PRODUCT, "매출_증감", "구매_증감"]
+                            if rev_col_key in up2.columns:
+                                up2_cols = [COL_PRODUCT, rev_col_key, "매출_증감", "구매_증감"]
+                            up2_disp = up2[up2_cols].rename(
+                                columns={COL_PRODUCT: "상품명", rev_col_key: "전일매출", "매출_증감": "증감(원)", "구매_증감": "구매증감(건)"}
+                            )
+                            if "전일매출" in up2_disp.columns:
+                                up2_disp["전일매출"] = up2_disp["전일매출"].map(lambda x: fm(float(x)))
+                            up2_disp["증감(원)"] = up2_disp["증감(원)"].map(lambda x: f"+{fm(float(x))}")
+                            up2_disp.index = range(1, len(up2_disp) + 1)
+                            st.dataframe(up2_disp, height=390)
+                    with col_dn2:
+                        st.markdown("🔻 **매출 하락 TOP10**")
+                        dn2 = all_prod_cmp[all_prod_cmp["매출_증감"] < 0].sort_values("매출_증감").head(10).copy()
+                        if dn2.empty:
+                            st.caption("하락 상품 없음")
+                        else:
+                            dn2_disp = dn2[up2_cols].rename(
+                                columns={COL_PRODUCT: "상품명", rev_col_key: "전일매출", "매출_증감": "증감(원)", "구매_증감": "구매증감(건)"}
+                            )
+                            if "전일매출" in dn2_disp.columns:
+                                dn2_disp["전일매출"] = dn2_disp["전일매출"].map(lambda x: fm(float(x)))
+                            dn2_disp["증감(원)"] = dn2_disp["증감(원)"].map(lambda x: fm(float(x)))
+                            dn2_disp.index = range(1, len(dn2_disp) + 1)
+                            st.dataframe(dn2_disp, height=390)
+            except Exception as _e:
+                st.exception(_e)
 
             st.divider()
 
@@ -1391,42 +1400,51 @@ def main() -> None:
                     st.dataframe(day_disp, height=390)
 
                 # ── 전일 대비 상승/하락 TOP10 ──
-                st.markdown(f"**전일 대비 상품 변동** ({d_max_s} vs {prev_s})")
-                m_prod_cmp = two_day_compare_ss(m_sub, [COL_PRODUCT], d_max, d_prev_file)
-                if not m_prod_cmp.empty:
-                    m_prod_cmp = m_prod_cmp[
-                        (m_prod_cmp[COL_PRODUCT] != "(미입력)") &
-                        (m_prod_cmp[COL_PRODUCT].astype(str).str.strip() != "-")
-                    ]
-                    col_up, col_dn = st.columns(2)
+                try:
+                    st.markdown(f"**전일 대비 상품 변동** ({d_max_s} vs {prev_s})")
+                    m_prod_cmp = two_day_compare_ss(m_sub, [COL_PRODUCT], d_max, d_prev_file)
+                    if not m_prod_cmp.empty:
+                        m_prod_cmp = m_prod_cmp[
+                            (m_prod_cmp[COL_PRODUCT] != "(미입력)") &
+                            (m_prod_cmp[COL_PRODUCT].astype(str).str.strip() != "-")
+                        ]
+                        _rev_key = f"{COL_REV_SS}_전일"
+                        _has_rev = _rev_key in m_prod_cmp.columns
+                        col_up, col_dn = st.columns(2)
 
-                    with col_up:
-                        st.markdown("🔺 **매출 상승 TOP10**")
-                        up = m_prod_cmp[m_prod_cmp["매출_증감"] > 0].head(10).copy()
-                        if up.empty:
-                            st.caption("상승 상품 없음")
-                        else:
-                            up_disp = up[[COL_PRODUCT, f"{COL_REV_SS}_전일", "매출_증감", "구매_증감"]].copy()
-                            up_disp.columns = ["상품명", f"매출 ({d_max_s})", "매출 증감", "구매 증감"]
-                            up_disp[f"매출 ({d_max_s})"] = up_disp[f"매출 ({d_max_s})"].map(lambda x: fm(float(x)))
-                            up_disp["매출 증감"] = up_disp["매출 증감"].map(lambda x: f"+{fm(float(x))}")
-                            up_disp["구매 증감"] = up_disp["구매 증감"].map(lambda x: f"{float(x):+,.0f}")
-                            up_disp.index = range(1, len(up_disp) + 1)
-                            st.dataframe(up_disp, height=390)
+                        with col_up:
+                            st.markdown("🔺 **매출 상승 TOP10**")
+                            up = m_prod_cmp[m_prod_cmp["매출_증감"] > 0].head(10).copy()
+                            if up.empty:
+                                st.caption("상승 상품 없음")
+                            else:
+                                _cols = [COL_PRODUCT] + ([_rev_key] if _has_rev else []) + ["매출_증감", "구매_증감"]
+                                up_disp = up[_cols].copy()
+                                _new_cols = ["상품명"] + ([f"매출 ({d_max_s})"] if _has_rev else []) + ["매출 증감", "구매 증감"]
+                                up_disp.columns = _new_cols
+                                if _has_rev:
+                                    up_disp[f"매출 ({d_max_s})"] = up_disp[f"매출 ({d_max_s})"].map(lambda x: fm(float(x)))
+                                up_disp["매출 증감"] = up_disp["매출 증감"].map(lambda x: f"+{fm(float(x))}")
+                                up_disp["구매 증감"] = up_disp["구매 증감"].map(lambda x: f"{float(x):+,.0f}")
+                                up_disp.index = range(1, len(up_disp) + 1)
+                                st.dataframe(up_disp, height=390)
 
-                    with col_dn:
-                        st.markdown("🔻 **매출 하락 TOP10**")
-                        dn = m_prod_cmp[m_prod_cmp["매출_증감"] < 0].sort_values("매출_증감").head(10).copy()
-                        if dn.empty:
-                            st.caption("하락 상품 없음")
-                        else:
-                            dn_disp = dn[[COL_PRODUCT, f"{COL_REV_SS}_전일", "매출_증감", "구매_증감"]].copy()
-                            dn_disp.columns = ["상품명", f"매출 ({d_max_s})", "매출 증감", "구매 증감"]
-                            dn_disp[f"매출 ({d_max_s})"] = dn_disp[f"매출 ({d_max_s})"].map(lambda x: fm(float(x)))
-                            dn_disp["매출 증감"] = dn_disp["매출 증감"].map(lambda x: fm(float(x)))
-                            dn_disp["구매 증감"] = dn_disp["구매 증감"].map(lambda x: f"{float(x):+,.0f}")
-                            dn_disp.index = range(1, len(dn_disp) + 1)
-                            st.dataframe(dn_disp, height=390)
+                        with col_dn:
+                            st.markdown("🔻 **매출 하락 TOP10**")
+                            dn = m_prod_cmp[m_prod_cmp["매출_증감"] < 0].sort_values("매출_증감").head(10).copy()
+                            if dn.empty:
+                                st.caption("하락 상품 없음")
+                            else:
+                                dn_disp = dn[_cols].copy()
+                                dn_disp.columns = _new_cols
+                                if _has_rev:
+                                    dn_disp[f"매출 ({d_max_s})"] = dn_disp[f"매출 ({d_max_s})"].map(lambda x: fm(float(x)))
+                                dn_disp["매출 증감"] = dn_disp["매출 증감"].map(lambda x: fm(float(x)))
+                                dn_disp["구매 증감"] = dn_disp["구매 증감"].map(lambda x: f"{float(x):+,.0f}")
+                                dn_disp.index = range(1, len(dn_disp) + 1)
+                                st.dataframe(dn_disp, height=390)
+                except Exception as _e:
+                    st.exception(_e)
 
                 st.divider()
 
