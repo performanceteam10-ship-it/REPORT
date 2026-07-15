@@ -15,6 +15,7 @@ import pandas as pd
 import plotly.graph_objects as go
 import streamlit as st
 
+from convert_report import xlsx_to_parquet
 from data_access import read_full as _read_parquet_full
 from drive_report import download_drive_file, list_drive_reports
 from madup_api import (
@@ -147,6 +148,16 @@ def _madup_bytes_cached(api_key: str, path: str, base: str) -> bytes:
 @st.cache_data(ttl=120, show_spinner=False)
 def _madup_latest_pair_cached(api_key: str, folder: str, base: str) -> tuple[str, bytes]:
     return find_latest_madup_path(api_key, folder, base)
+
+
+def _ensure_parquet(xlsx_path: Path) -> Path:
+    """xlsx → parquet 자동 변환. 이미 최신 parquet이 있으면 재변환 생략."""
+    out = xlsx_path.with_suffix(".parquet")
+    if out.exists() and out.stat().st_mtime >= xlsx_path.stat().st_mtime:
+        return out
+    with st.spinner("parquet 변환 중… (첫 로드만 시간이 걸립니다)"):
+        xlsx_to_parquet(xlsx_path, out)
+    return out
 
 
 # ── 포매터 ───────────────────────────────────────────────────────────────────
@@ -769,6 +780,8 @@ def main() -> None:
                     ext = ".parquet" if str(dp).lower().endswith(".parquet") else ".xlsx"
                     path = Path(tempfile.gettempdir()) / f"sn_madup_latest{ext}"
                     path.write_bytes(data)
+                    if ext == ".xlsx":
+                        path = _ensure_parquet(path)
                     st.caption(f"열림: `{dp}`")
                 else:
                     tags = [
@@ -796,6 +809,8 @@ def main() -> None:
                     ext = ".parquet" if str(dp).lower().endswith(".parquet") else ".xlsx"
                     path = Path(tempfile.gettempdir()) / f"sn_madup_{pick}{ext}"
                     path.write_bytes(data)
+                    if ext == ".xlsx":
+                        path = _ensure_parquet(path)
                     st.caption(f"열림: `{dp}`")
             elif single_path:
                 try:
@@ -806,6 +821,8 @@ def main() -> None:
                 ext = ".parquet" if single_path.lower().endswith(".parquet") else ".xlsx"
                 path = Path(tempfile.gettempdir()) / f"sn_madup_single{ext}"
                 path.write_bytes(data)
+                if ext == ".xlsx":
+                    path = _ensure_parquet(path)
                 st.caption(f"열림: `{single_path}`")
             else:
                 st.error("MADUP_DROPBOX_FOLDER 또는 MADUP_DROPBOX_PATH 가 Secrets에 필요합니다.")
