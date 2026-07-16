@@ -852,8 +852,6 @@ def main() -> None:
                     path = Path(tempfile.gettempdir()) / f"sn_madup_{_tag}{ext}"
                     if not path.exists():
                         path.write_bytes(data)
-                    if ext == ".xlsx":
-                        path = _ensure_parquet(path)
                     st.caption(f"열림: `{dp}`")
                 else:
                     tags = [
@@ -882,8 +880,6 @@ def main() -> None:
                     path = Path(tempfile.gettempdir()) / f"sn_madup_{pick}{ext}"
                     if not path.exists():
                         path.write_bytes(data)
-                    if ext == ".xlsx":
-                        path = _ensure_parquet(path)
                     st.caption(f"열림: `{dp}`")
             elif single_path:
                 try:
@@ -897,8 +893,6 @@ def main() -> None:
                 path = Path(tempfile.gettempdir()) / f"sn_madup_{_stag}{ext}"
                 if not path.exists():
                     path.write_bytes(data)
-                if ext == ".xlsx":
-                    path = _ensure_parquet(path)
                 st.caption(f"열림: `{single_path}`")
             else:
                 st.error("MADUP_DROPBOX_FOLDER 또는 MADUP_DROPBOX_PATH 가 Secrets에 필요합니다.")
