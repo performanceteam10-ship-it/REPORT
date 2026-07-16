@@ -852,6 +852,8 @@ def main() -> None:
                     path = Path(tempfile.gettempdir()) / f"sn_madup_{_tag}{ext}"
                     if not path.exists():
                         path.write_bytes(data)
+                    if ext == ".xlsx":
+                        path = _ensure_parquet(path)
                     st.caption(f"열림: `{dp}`")
                 else:
                     tags = [
@@ -880,6 +882,8 @@ def main() -> None:
                     path = Path(tempfile.gettempdir()) / f"sn_madup_{pick}{ext}"
                     if not path.exists():
                         path.write_bytes(data)
+                    if ext == ".xlsx":
+                        path = _ensure_parquet(path)
                     st.caption(f"열림: `{dp}`")
             elif single_path:
                 try:
@@ -893,6 +897,8 @@ def main() -> None:
                 path = Path(tempfile.gettempdir()) / f"sn_madup_{_stag}{ext}"
                 if not path.exists():
                     path.write_bytes(data)
+                if ext == ".xlsx":
+                    path = _ensure_parquet(path)
                 st.caption(f"열림: `{single_path}`")
             else:
                 st.error("MADUP_DROPBOX_FOLDER 또는 MADUP_DROPBOX_PATH 가 Secrets에 필요합니다.")
@@ -983,6 +989,24 @@ def main() -> None:
         if st.button("데이터 새로고침"):
             st.cache_data.clear()
             st.rerun()
+
+        # ── 로컬 PC에서만 표시: xlsx → parquet 변환 버튼 ──
+        if DEFAULT_REPORT_DIR.is_dir():
+            st.divider()
+            st.caption("📦 로컬 parquet 변환")
+            if st.button("xlsx → parquet 변환"):
+                latest_xlsx = find_latest_report(DEFAULT_REPORT_DIR)
+                if latest_xlsx is None or latest_xlsx.suffix.lower() != ".xlsx":
+                    st.warning("변환할 xlsx 파일이 없습니다.")
+                else:
+                    out_pq = latest_xlsx.with_suffix(".parquet")
+                    with st.spinner(f"{latest_xlsx.name} 변환 중…"):
+                        try:
+                            xlsx_to_parquet(latest_xlsx, out_pq)
+                            st.success(f"완료: {out_pq.name} ({out_pq.stat().st_size/1024/1024:.1f}MB)")
+                            st.cache_data.clear()
+                        except Exception as _e:
+                            st.error(f"변환 실패: {_e}")
 
     try:
         raw_df = load_raw(str(path))
