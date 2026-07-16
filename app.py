@@ -847,10 +847,11 @@ def main() -> None:
                         st.error(f"Madup API: {e}")
                         st.stop()
                     ext = ".parquet" if str(dp).lower().endswith(".parquet") else ".xlsx"
-                    path = Path(tempfile.gettempdir()) / f"sn_madup_latest{ext}"
-                    path.write_bytes(data)
-                    if ext == ".xlsx":
-                        path = _ensure_parquet(path)
+                    _m = re.search(r"(\d{6})", dp)
+                    _tag = _m.group(1) if _m else "latest"
+                    path = Path(tempfile.gettempdir()) / f"sn_madup_{_tag}{ext}"
+                    if not path.exists():
+                        path.write_bytes(data)
                     st.caption(f"열림: `{dp}`")
                 else:
                     tags = [
@@ -877,9 +878,8 @@ def main() -> None:
                         st.stop()
                     ext = ".parquet" if str(dp).lower().endswith(".parquet") else ".xlsx"
                     path = Path(tempfile.gettempdir()) / f"sn_madup_{pick}{ext}"
-                    path.write_bytes(data)
-                    if ext == ".xlsx":
-                        path = _ensure_parquet(path)
+                    if not path.exists():
+                        path.write_bytes(data)
                     st.caption(f"열림: `{dp}`")
             elif single_path:
                 try:
@@ -888,10 +888,11 @@ def main() -> None:
                     st.error(f"Madup API: {e}")
                     st.stop()
                 ext = ".parquet" if single_path.lower().endswith(".parquet") else ".xlsx"
-                path = Path(tempfile.gettempdir()) / f"sn_madup_single{ext}"
-                path.write_bytes(data)
-                if ext == ".xlsx":
-                    path = _ensure_parquet(path)
+                _ms = re.search(r"(\d{6})", single_path)
+                _stag = _ms.group(1) if _ms else "single"
+                path = Path(tempfile.gettempdir()) / f"sn_madup_{_stag}{ext}"
+                if not path.exists():
+                    path.write_bytes(data)
                 st.caption(f"열림: `{single_path}`")
             else:
                 st.error("MADUP_DROPBOX_FOLDER 또는 MADUP_DROPBOX_PATH 가 Secrets에 필요합니다.")
