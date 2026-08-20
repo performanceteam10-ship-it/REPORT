@@ -168,6 +168,21 @@ def _madup_latest_pair_cached(api_key: str, folder: str, base: str) -> tuple[str
     return find_latest_madup_path(api_key, folder, base)
 
 
+def _manual_upload_path() -> Path | None:
+    """Madup API·드라이브 장애 시 우회용 수동 업로드. 올라온 파일의 임시 경로를 반환."""
+    up = st.file_uploader(
+        "직접 업로드 (xlsx / parquet)",
+        type=["xlsx", "parquet"],
+        help="Madup API 나 드라이브가 안 될 때 Dropbox에서 내려받은 리포트를 그대로 올리세요.",
+    )
+    if up is None:
+        return None
+    safe = re.sub(r"[^0-9A-Za-z._-]", "_", up.name)
+    dest = Path(tempfile.gettempdir()) / f"sn_upload_{safe}"
+    dest.write_bytes(up.getvalue())
+    return dest
+
+
 def _ensure_parquet(xlsx_path: Path) -> Path:
     """xlsx → parquet 자동 변환. 이미 최신 parquet이 있으면 재변환 생략."""
     out = xlsx_path.with_suffix(".parquet")
@@ -827,7 +842,12 @@ def main() -> None:
         st.subheader("리포트 파일")
         path: Path
 
-        if _madup_secrets_ok():
+        _up_path = _manual_upload_path()
+        if _up_path is not None:
+            st.caption("📤 **직접 업로드** (Madup API 우회)")
+            path = _up_path
+            st.caption(f"열림: `{_up_path.name}`")
+        elif _madup_secrets_ok():
             st.caption("🔗 **Madup API** (Dropbox 다운로드)")
             api_key = str(st.secrets["MADUP_API_KEY"]).strip()
             base = str(st.secrets.get("MADUP_API_BASE") or MADUP_API_DEFAULT_BASE).strip()
@@ -845,6 +865,7 @@ def main() -> None:
                         dp, data = _madup_latest_pair_cached(api_key, folder, base)
                     except Exception as e:
                         st.error(f"Madup API: {e}")
+                        st.info("👆 위 **직접 업로드**에 Dropbox에서 받은 리포트를 올리면 그대로 볼 수 있습니다.")
                         st.stop()
                     ext = ".parquet" if str(dp).lower().endswith(".parquet") else ".xlsx"
                     _m = re.search(r"(\d{6})", dp)
@@ -886,6 +907,7 @@ def main() -> None:
                     data = _madup_bytes_cached(api_key, single_path, base)
                 except Exception as e:
                     st.error(f"Madup API: {e}")
+                    st.info("👆 위 **직접 업로드**에 Dropbox에서 받은 리포트를 올리면 그대로 볼 수 있습니다.")
                     st.stop()
                 ext = ".parquet" if single_path.lower().endswith(".parquet") else ".xlsx"
                 _ms = re.search(r"(\d{6})", single_path)
