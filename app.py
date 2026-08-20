@@ -588,8 +588,15 @@ def summary_depth_comment(raw: pd.DataFrame, d_last: pd.Timestamp, d_prev: pd.Ti
     r_copy = raw.copy()
     r_copy["d"] = r_copy["날짜"].dt.normalize()
 
-    def _channel_section(title: str, channel_df: pd.DataFrame, emoji: str) -> None:
-        """채널 데이터프레임으로 매체상세별 영향도 코멘트 생성."""
+    def _channel_section(
+        title: str, channel_df: pd.DataFrame, emoji: str, basis: str = "SS"
+    ) -> None:
+        """채널 데이터프레임으로 매체상세별 영향도 코멘트 생성.
+
+        basis: 매출/ROAS 에 표기할 기준 라벨. 값 자체는 항상
+        '(스마트스토어센터기준)' 컬럼에서 오지만, D2C 는 그 컬럼에 카페24
+        데이터가 적재되어 있어 '카페24' 로 표기한다.
+        """
         if channel_df.empty or "날짜" not in channel_df.columns:
             lines.append(f"\n---\n#### {emoji} {title}  ({last_s} vs {prev_s})")
             lines.append("_데이터 없음_\n")
@@ -608,7 +615,7 @@ def summary_depth_comment(raw: pd.DataFrame, d_last: pd.Timestamp, d_prev: pd.Ti
 
         lines.append(f"\n---\n#### {emoji} {title}  ({last_s} vs {prev_s})")
         lines.append(
-            f"{dir_emoji} SS 매출 **{ch_cur['SS_매출']:,.0f}원** ({rev_d:+,.0f}원) · "
+            f"{dir_emoji} {basis} 매출 **{ch_cur['SS_매출']:,.0f}원** ({rev_d:+,.0f}원) · "
             f"비용 **{ch_cur['비용']:,.0f}원** · ROAS **{ch_cur['ROAS_SS']:.1f}%** ({roas_d:+.1f}p)\n"
         )
 
@@ -622,7 +629,7 @@ def summary_depth_comment(raw: pd.DataFrame, d_last: pd.Timestamp, d_prev: pd.Ti
 
             lines.append(
                 f"##### {rank}. {media}  ({delta_dir})\n"
-                f"**[SS 기준]** 매출 **{ss_rev:,.0f}원** ({mr['매출_증감']:+,.0f}원) · "
+                f"**[{basis} 기준]** 매출 **{ss_rev:,.0f}원** ({mr['매출_증감']:+,.0f}원) · "
                 f"비용 {cost_val:,.0f}원 ({cost_d:+,.0f}원) · "
                 f"ROAS {mr['ROAS%_전일']:.1f}% ({mr['ROAS%p_차이']:+.1f}p)"
             )
@@ -642,7 +649,7 @@ def summary_depth_comment(raw: pd.DataFrame, d_last: pd.Timestamp, d_prev: pd.Ti
                 if not prod_sub.empty:
                     m_prod = two_day_compare_ss(prod_sub, [COL_PRODUCT], d_last, d_prev)
                     if not m_prod.empty:
-                        lines.append("\n**실전환 광고 상품 (SS 기준):**")
+                        lines.append(f"\n**실전환 광고 상품 ({basis} 기준):**")
                         for _, rr in m_prod.head(3).iterrows():
                             pname = str(rr.get(COL_PRODUCT, ""))
                             if len(pname) > 50:
@@ -699,13 +706,14 @@ def summary_depth_comment(raw: pd.DataFrame, d_last: pd.Timestamp, d_prev: pd.Ti
 
     # D2C 채널 (자사몰) — 매체: 메타 피드 / 구글 검색광고 / 네이버 파워링크
     # 주의: D2C 행에 한해 raw 의 '(스마트스토어센터기준)' 컬럼에는 카페24 데이터가
-    # 적재되어 있다. 따라서 D2C 도 다른 채널과 동일하게 SS 기준으로 보는 것이 맞다.
+    # 적재되어 있다. 그래서 계산은 다른 채널과 동일한 SS 컬럼을 쓰지만 화면에는
+    # basis="카페24" 로 표기한다.
     # (DB 기준은 광고 대시보드 어트리뷰션 값이라 자사몰 실매출보다 과대 집계됨)
     d2c_df = (
         r_copy[r_copy["채널"].astype(str).str.strip().str.upper() == "D2C"]
         if "채널" in r_copy.columns else pd.DataFrame()
     )
-    _channel_section("D2C 채널", d2c_df, "🔵")
+    _channel_section("D2C 채널", d2c_df, "🔵", basis="카페24")
 
     # ── 4) SUMMARY 표 (SS 기준 매출/ROAS + DB 기준 캠페인 참고) ──
     lines.append(f"---\n#### 📊 SUMMARY  ({last_s} vs {prev_s} 대비)")
