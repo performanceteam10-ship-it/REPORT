@@ -698,6 +698,9 @@ def summary_depth_comment(raw: pd.DataFrame, d_last: pd.Timestamp, d_prev: pd.Ti
     _channel_section("쿠팡 채널", coup_df, "🟡")
 
     # D2C 채널 (자사몰) — 매체: 메타 피드 / 구글 검색광고 / 네이버 파워링크
+    # 주의: D2C 행에 한해 raw 의 '(스마트스토어센터기준)' 컬럼에는 카페24 데이터가
+    # 적재되어 있다. 따라서 D2C 도 다른 채널과 동일하게 SS 기준으로 보는 것이 맞다.
+    # (DB 기준은 광고 대시보드 어트리뷰션 값이라 자사몰 실매출보다 과대 집계됨)
     d2c_df = (
         r_copy[r_copy["채널"].astype(str).str.strip().str.upper() == "D2C"]
         if "채널" in r_copy.columns else pd.DataFrame()
