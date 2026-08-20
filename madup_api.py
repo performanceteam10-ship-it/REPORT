@@ -8,7 +8,7 @@ from datetime import datetime, timedelta
 
 import requests
 
-DEFAULT_BASE = "https://api-auth.madup-dct.site"
+DEFAULT_BASE = "https://api-auth.madup.app"
 
 
 def madup_report_filenames(tag: str) -> tuple[str, ...]:

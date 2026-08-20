@@ -42,8 +42,8 @@ Streamlit 앱. **Madup API**(Dropbox HTTP 다운로드), **구글 드라이브**
 
    ```toml
    MADUP_API_KEY = "발급받은_API_키"
-   # 선택: 기본값 https://api-auth.madup-dct.site
-   # MADUP_API_BASE = "https://api-auth.madup-dct.site"
+   # 선택: 기본값 https://api-auth.madup.app
+   # MADUP_API_BASE = "https://api-auth.madup.app"
 
    # 아래 둘 중 하나: 폴더 경로(끝에 슬래시 없이) 또는 파일 전체 경로
    MADUP_DROPBOX_FOLDER = "/reports/샤크닌자"
