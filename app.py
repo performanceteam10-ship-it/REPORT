@@ -627,7 +627,9 @@ def summary_depth_comment(raw: pd.DataFrame, d_last: pd.Timestamp, d_prev: pd.Ti
                 f"ROAS {mr['ROAS%_전일']:.1f}% ({mr['ROAS%p_차이']:+.1f}p)"
             )
 
-            sub = r_copy[r_copy["매체상세"].astype(str) == str(media)]
+            # 매체상세 이름이 채널 간 중복(예: '네이버 파워링크' 는 네이버브랜드스토어·D2C 양쪽에 존재)
+            # 되므로 반드시 해당 채널 범위 안에서만 하위 분해한다.
+            sub = channel_df[channel_df["매체상세"].astype(str) == str(media)]
 
             # 실전환 상품 (쿠팡 제외, SS 기준)
             if "쿠팡" not in str(media):
@@ -694,6 +696,13 @@ def summary_depth_comment(raw: pd.DataFrame, d_last: pd.Timestamp, d_prev: pd.Ti
     # 쿠팡 채널
     coup_df = r_copy[r_copy["채널"].astype(str).str.contains("쿠팡", na=False)] if "채널" in r_copy.columns else pd.DataFrame()
     _channel_section("쿠팡 채널", coup_df, "🟡")
+
+    # D2C 채널 (자사몰) — 매체: 메타 피드 / 구글 검색광고 / 네이버 파워링크
+    d2c_df = (
+        r_copy[r_copy["채널"].astype(str).str.strip().str.upper() == "D2C"]
+        if "채널" in r_copy.columns else pd.DataFrame()
+    )
+    _channel_section("D2C 채널", d2c_df, "🔵")
 
     # ── 4) SUMMARY 표 (SS 기준 매출/ROAS + DB 기준 캠페인 참고) ──
     lines.append(f"---\n#### 📊 SUMMARY  ({last_s} vs {prev_s} 대비)")
