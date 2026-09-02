@@ -248,11 +248,16 @@ def kpi_achievement(raw: pd.DataFrame, d_max: pd.Timestamp) -> dict[str, tuple[f
         elif ch_key == "쿠팡" or "coup" in ch_key:
             coup_mask = sub["채널"].astype(str).str.contains("쿠팡", na=False, case=False)
             achieved = float(sub.loc[coup_mask, COL_REV_SS].sum())
+        elif ch_key == "d2c":
+            d2c_mask = sub["채널"].astype(str).str.contains("D2C", na=False, case=False)
+            achieved = float(sub.loc[d2c_mask, COL_REV_SS].sum())
         elif ch_key == "othermall":
-            # 네이버/쿠팡 제외한 나머지 채널 SS 매출 합산
+            # 네이버/쿠팡/D2C 제외한 나머지 채널 SS 매출 합산
+            # (D2C 는 별도 KPI 로 잡으므로 여기서 빼서 이중 집계를 막는다)
             other_mask = (
                 ~sub["채널"].astype(str).str.contains("네이버", na=False, case=False) &
-                ~sub["채널"].astype(str).str.contains("쿠팡", na=False, case=False)
+                ~sub["채널"].astype(str).str.contains("쿠팡", na=False, case=False) &
+                ~sub["채널"].astype(str).str.contains("D2C", na=False, case=False)
             )
             achieved = float(sub.loc[other_mask, COL_REV_SS].sum())
         else:
@@ -1126,9 +1131,11 @@ def main() -> None:
         # ── 2. KPI 달성률 ────────────────────────────────────────────────────
         st.subheader(f"🎯 KPI 달성률  ({d_max.month}월 누계)")
         kpi_data = kpi_achievement(raw_df, d_max)
-        k1, k2, k3 = st.columns(3)
-        for col, (name, (achieved, target)) in zip([k1, k2, k3], kpi_data.items()):
-            col.markdown(kpi_bar_html(name, achieved, target), unsafe_allow_html=True)
+        if kpi_data:
+            # KPI.xlsx 채널 수만큼 칸을 만든다 (행 추가/삭제해도 코드 수정 불필요)
+            kpi_cols = st.columns(len(kpi_data))
+            for col, (name, (achieved, target)) in zip(kpi_cols, kpi_data.items()):
+                col.markdown(kpi_bar_html(name, achieved, target), unsafe_allow_html=True)
 
         st.divider()
 
