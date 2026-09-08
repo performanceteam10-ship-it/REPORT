@@ -6,32 +6,47 @@ import pyarrow as pa
 import pyarrow.parquet as pq
 
 DATE_COL = "날짜"
+_BATCH_ROWS = 100_000
+
+
+def _is_str(t: pa.DataType) -> bool:
+    return pa.types.is_string(t) or pa.types.is_large_string(t)
 
 
 def read_full(path: str) -> pd.DataFrame:
     """parquet 전체를 DataFrame 으로 읽어 날짜 컬럼을 datetime 으로 정규화.
 
     문자열 라벨 컬럼(채널·매체·캠페인·상품·브랜드구분 등)은 Arrow dictionary 로
-    읽어 pandas category 로 받는다. 리포트 기간 확장으로 행수가 100만+로 늘면서
-    문자열 컬럼이 메모리 대부분을 차지, Streamlit Cloud 무료 티어에서 OOM 크래시가 났다.
+    읽어 pandas category 로 받는다(전체 행/값 보존, resident df ~91MB).
 
-    ★ 핵심: category 변환을 '읽은 뒤 astype' 으로 하면 전체 문자열 df 를 먼저
-    만들어 로드 피크가 ~1.4GB 까지 치솟아 여전히 OOM 이었다. Arrow 단계에서
-    dictionary 로 캐스팅한 뒤 to_pandas 하면 문자열이 pandas 에 통째로
-    올라오지 않아 로드 피크가 ~70MB 로 떨어진다(전체 행/값은 그대로 보존).
+    ★ OOM 방지 핵심 (2026-09-08): 리포트 기간이 8/1~ → 7/1~ 로 늘며 행수가
+    100만+로 2배가 됐고, Streamlit Cloud 무료 티어(~1GB)에서 로드 중 크래시했다.
+    - `SELECT *` (duckdb.fetch_df) 방식: 로드 RSS ~1.4GB → OOM.
+    - 통째 `pq.read_table` 후 to_pandas: category 로 줄여도 로드 RSS ~980MB → 여전히 OOM
+      (Arrow 가 parquet 전체를 압축해제하며 큰 C++ 버퍼를 잡음).
+    - 아래처럼 row-group 을 배치로 스트리밍하며 배치별로 dictionary 캐스팅하고
+      `to_pandas(self_destruct=True, split_blocks=True)` + 메모리풀 해제까지 하면
+      로드 RSS ~386MB 로 떨어져 무료 티어에서 안전하다(실측).
     """
-    table = pq.read_table(str(path))
-    fields = []
-    columns = []
-    for name in table.column_names:
-        col = table.column(name)
-        t = col.type
-        if name != DATE_COL and (pa.types.is_string(t) or pa.types.is_large_string(t)):
-            col = col.cast(pa.dictionary(pa.int32(), pa.string()))
-        fields.append(name)
-        columns.append(col)
-    table = pa.table(columns, names=fields)
-    df = table.to_pandas()  # dictionary -> category, 나머지는 원형 dtype 유지
+    pf = pq.ParquetFile(str(path))
+    names = pf.schema_arrow.names
+    batches: list[pa.RecordBatch] = []
+    for batch in pf.iter_batches(batch_size=_BATCH_ROWS):
+        arrays = []
+        for i, name in enumerate(names):
+            col = batch.column(i)
+            if name != DATE_COL and _is_str(col.type):
+                col = col.cast(pa.dictionary(pa.int32(), pa.string()))
+            arrays.append(col)
+        batches.append(pa.record_batch(arrays, names=names))
+    table = pa.Table.from_batches(batches, schema=batches[0].schema) if batches else pf.read()
+    del batches
+    df = table.to_pandas(self_destruct=True, split_blocks=True)
+    del table
+    try:
+        pa.default_memory_pool().release_unused()
+    except Exception:
+        pass
     if DATE_COL in df.columns:
         df[DATE_COL] = pd.to_datetime(df[DATE_COL], errors="coerce")
     return df
