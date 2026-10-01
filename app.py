@@ -481,7 +481,7 @@ def two_day_compare(
     dp = pd.Timestamp(d_prev).normalize()
     for c in group_cols:
         if c in r.columns:
-            r[c] = r[c].fillna("(미입력)").astype(str)
+            r[c] = r[c].astype(object).fillna("(미입력)").astype(str)
     agg_cols = [c for c in [COL_REV_DB, COL_COST, COL_BUY_DB] if c in r.columns]
 
     def one(d: pd.Timestamp) -> pd.DataFrame:
@@ -520,7 +520,7 @@ def two_day_compare_ss(
     dp = pd.Timestamp(d_prev).normalize()
     for c in group_cols:
         if c in r.columns:
-            r[c] = r[c].fillna("(미입력)").astype(str)
+            r[c] = r[c].astype(object).fillna("(미입력)").astype(str)
     agg_cols = [c for c in [COL_REV_SS, COL_BUY_SS, COL_COST] if c in r.columns]
 
     def one(d: pd.Timestamp) -> pd.DataFrame:
@@ -820,7 +820,7 @@ def product_top10_table(
     r = raw.copy()
     r["d"] = r["날짜"].dt.normalize()
     r = r[r["매체상세"].astype(str) == str(media)]
-    r[COL_PRODUCT] = r[COL_PRODUCT].fillna("(미입력)")
+    r[COL_PRODUCT] = r[COL_PRODUCT].astype(object).fillna("(미입력)")
     last = r[r["d"] == dl].groupby(COL_PRODUCT)[[COL_REV_DB, COL_COST, COL_BUY_DB]].sum()
     last = last.sort_values(COL_REV_DB, ascending=False).head(10)
     prev = r[r["d"] == dp].groupby(COL_PRODUCT)[[COL_REV_DB, COL_COST, COL_BUY_DB]].sum()
