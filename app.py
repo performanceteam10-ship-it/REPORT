@@ -22,6 +22,7 @@ from data_access import read_full as _read_parquet_full
 from drive_report import download_drive_file, list_drive_reports
 from madup_api import (
     DEFAULT_BASE as MADUP_API_DEFAULT_BASE,
+    GatewayUnavailable,
     download_madup_file,
     find_latest_madup_path,
     madup_report_filenames,
@@ -917,6 +918,10 @@ def main() -> None:
                             data = _madup_bytes_cached(api_key, cand, base)
                             dp = cand
                             break
+                        except GatewayUnavailable as e:
+                            st.error(f"Madup API: {e}")
+                            st.info("👆 위 **직접 업로드**에 Dropbox에서 받은 리포트를 올리면 그대로 볼 수 있습니다.")
+                            st.stop()
                         except Exception:
                             continue
                     if data is None:

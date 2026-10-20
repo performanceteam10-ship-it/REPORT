@@ -9,6 +9,12 @@ from datetime import datetime, timedelta
 import requests
 
 DEFAULT_BASE = "https://api-auth.madup.app"
+# (connect, read) 초. read 는 바이트 사이 대기 한도라 큰 파일 다운로드엔 영향 없음.
+DEFAULT_TIMEOUT = (10, 30)
+
+
+class GatewayUnavailable(RuntimeError):
+    """게이트웨이 자체 장애(무응답·연결 실패·5xx). 파일명을 바꿔 재시도해도 소용없음."""
 
 
 def madup_report_filenames(tag: str) -> tuple[str, ...]:
@@ -25,15 +31,22 @@ def download_madup_file(
     api_key: str,
     path: str,
     base_url: str = DEFAULT_BASE,
-    timeout: int = 120,
+    timeout: tuple[float, float] = DEFAULT_TIMEOUT,
 ) -> bytes:
     url = f"{base_url.rstrip('/')}/api/dropbox/download"
-    r = requests.post(
-        url,
-        headers={"X-API-Key": api_key, "Content-Type": "application/json"},
-        json={"path": path},
-        timeout=timeout,
-    )
+    try:
+        r = requests.post(
+            url,
+            headers={"X-API-Key": api_key, "Content-Type": "application/json"},
+            json={"path": path},
+            timeout=timeout,
+        )
+    except (requests.Timeout, requests.ConnectionError) as e:
+        raise GatewayUnavailable(f"Madup 게이트웨이 응답 없음 ({base_url}): {type(e).__name__}") from e
+    if r.status_code >= 500:
+        raise GatewayUnavailable(f"Madup 게이트웨이 장애 HTTP {r.status_code}: {r.text[:300]}")
+    if r.status_code in (401, 403):
+        raise GatewayUnavailable(f"Madup API 키 인증 실패 HTTP {r.status_code}: {r.text[:300]}")
     if r.status_code != 200:
         raise requests.HTTPError(f"HTTP {r.status_code}: {r.text[:500]}")
     return r.content
@@ -57,6 +70,8 @@ def find_latest_madup_path(
                 b = download_madup_file(api_key, path, base_url)
                 if len(b) > 200:
                     return path, b
+            except GatewayUnavailable:
+                raise
             except Exception as e:
                 last_err = e
                 continue
