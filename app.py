@@ -169,6 +169,18 @@ def _madup_latest_pair_cached(api_key: str, folder: str, base: str) -> tuple[str
     return find_latest_madup_path(api_key, folder, base)
 
 
+def _write_report_bytes(path: Path, data: bytes) -> None:
+    """다운로드 바이트를 임시파일로 저장. Dropbox 업로드 도중 받은 불완전 parquet은 거르고,
+    이전에 깨진 파일이 남아 있으면 크기 비교로 덮어쓴다."""
+    if path.suffix.lower() == ".parquet" and not (data[:4] == b"PAR1" and data[-4:] == b"PAR1"):
+        _madup_bytes_cached.clear()
+        _madup_latest_pair_cached.clear()
+        st.error("리포트 parquet이 아직 Dropbox에 올라가는 중이거나 손상됐습니다. 1~2분 뒤 새로고침해 주세요.")
+        st.stop()
+    if not path.exists() or path.stat().st_size != len(data):
+        path.write_bytes(data)
+
+
 def _manual_upload_path() -> Path | None:
     """Madup API·드라이브 장애 시 우회용 수동 업로드. 올라온 파일의 임시 경로를 반환."""
     up = st.file_uploader(
@@ -897,8 +909,7 @@ def main() -> None:
                     _m = re.search(r"(\d{6})", dp)
                     _tag = _m.group(1) if _m else "latest"
                     path = Path(tempfile.gettempdir()) / f"sn_madup_{_tag}{ext}"
-                    if not path.exists():
-                        path.write_bytes(data)
+                    _write_report_bytes(path, data)
                     st.caption(f"열림: `{dp}`")
                 else:
                     tags = [
@@ -929,8 +940,7 @@ def main() -> None:
                         st.stop()
                     ext = ".parquet" if str(dp).lower().endswith(".parquet") else ".xlsx"
                     path = Path(tempfile.gettempdir()) / f"sn_madup_{pick}{ext}"
-                    if not path.exists():
-                        path.write_bytes(data)
+                    _write_report_bytes(path, data)
                     st.caption(f"열림: `{dp}`")
             elif single_path:
                 try:
@@ -943,8 +953,7 @@ def main() -> None:
                 _ms = re.search(r"(\d{6})", single_path)
                 _stag = _ms.group(1) if _ms else "single"
                 path = Path(tempfile.gettempdir()) / f"sn_madup_{_stag}{ext}"
-                if not path.exists():
-                    path.write_bytes(data)
+                _write_report_bytes(path, data)
                 st.caption(f"열림: `{single_path}`")
             else:
                 st.error("MADUP_DROPBOX_FOLDER 또는 MADUP_DROPBOX_PATH 가 Secrets에 필요합니다.")
