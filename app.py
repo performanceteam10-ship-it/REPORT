@@ -488,10 +488,13 @@ def two_day_compare(
     raw: pd.DataFrame, group_cols: list[str],
     d_last: pd.Timestamp, d_prev: pd.Timestamp,
 ) -> pd.DataFrame:
-    r = raw.copy()
-    r["d"] = r["날짜"].dt.normalize()
     dl = pd.Timestamp(d_last).normalize()
     dp = pd.Timestamp(d_prev).normalize()
+    # 두 날짜 행만 남긴 뒤 복사·문자열 변환 (전체 raw 복사가 데일리 코멘트 지연의 주범)
+    d = raw["날짜"].dt.normalize()
+    keep = d.isin([dl, dp])
+    r = raw.loc[keep].copy()
+    r["d"] = d[keep]
     for c in group_cols:
         if c in r.columns:
             r[c] = r[c].astype(object).fillna("(미입력)").astype(str)
@@ -527,10 +530,13 @@ def two_day_compare_ss(
     d_last: pd.Timestamp, d_prev: pd.Timestamp,
 ) -> pd.DataFrame:
     """SS(스마트스토어) 기준 매출/구매 + 비용/ROAS 비교"""
-    r = raw.copy()
-    r["d"] = r["날짜"].dt.normalize()
     dl = pd.Timestamp(d_last).normalize()
     dp = pd.Timestamp(d_prev).normalize()
+    # 두 날짜 행만 남긴 뒤 복사·문자열 변환 (전체 raw 복사가 데일리 코멘트 지연의 주범)
+    d = raw["날짜"].dt.normalize()
+    keep = d.isin([dl, dp])
+    r = raw.loc[keep].copy()
+    r["d"] = d[keep]
     for c in group_cols:
         if c in r.columns:
             r[c] = r[c].astype(object).fillna("(미입력)").astype(str)
@@ -603,8 +609,11 @@ def summary_depth_comment(raw: pd.DataFrame, d_last: pd.Timestamp, d_prev: pd.Ti
     )
 
     # ── 3) 채널별 데일리 코멘트 ──
-    r_copy = raw.copy()
-    r_copy["d"] = r_copy["날짜"].dt.normalize()
+    # 채널별 코멘트는 전일·전전일만 쓰므로 두 날짜 행만 남긴다 (매체별 astype(str) 반복 비용 축소)
+    _d = raw["날짜"].dt.normalize()
+    _keep = _d.isin([pd.Timestamp(d_last).normalize(), pd.Timestamp(d_prev).normalize()])
+    r_copy = raw.loc[_keep].copy()
+    r_copy["d"] = _d[_keep]
 
     def _channel_section(
         title: str, channel_df: pd.DataFrame, emoji: str, basis: str = "SS"
